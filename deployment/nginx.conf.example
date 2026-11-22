@@ -1,0 +1,69 @@
+# Nginx Virtual Host configuration for Social Media Downloader Pro
+# Subdomain: downloader.yourdomain.com
+# Port 5000: Node.js Express backend API
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name downloader.yourdomain.com;
+
+    # Redirect all HTTP requests to HTTPS
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name downloader.yourdomain.com;
+
+    # SSL certificates managed via Certbot
+    ssl_certificate /etc/letsencrypt/live/downloader.yourdomain.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/downloader.yourdomain.com/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+
+    # Security Headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self' https: data: 'unsafe-inline' 'unsafe-eval';" always;
+
+    # Maximum file upload/download size (match server .env MAX_FILE_SIZE_MB)
+    client_max_body_size 2048M;
+
+    # Frontend SPA build directory
+    root /var/www/social-media-downloader-pro/client/dist;
+    index index.html;
+
+    # Static assets caching
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # Proxy API & SSE requests to Node.js backend
+    location /api/ {
+        proxy_pass http://127.0.0.1:5000;
+        proxy_http_version 1.1;
+
+        # WebSocket & SSE header support
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Disable buffering for Server-Sent Events (SSE) live progress updates
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+
+    # Fallback to index.html for React Router SPA
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

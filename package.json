@@ -1,0 +1,22 @@
+{
+  "name": "social-media-downloader-pro",
+  "version": "1.0.0",
+  "description": "Premium private social media downloader web application",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
+    "dev:client": "cd client && npm run dev",
+    "dev:server": "cd server && npm run dev",
+    "build": "cd client && npm run build",
+    "start": "cd server && npm start",
+    "setup": "npm install && cd client && npm install && cd ../server && npm install",
+    "test": "cd server && npm test",
+    "create-admin": "cd server && node scripts/createAdmin.js"
+  },
+  "keywords": ["social-media", "downloader", "private"],
+  "author": "",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
