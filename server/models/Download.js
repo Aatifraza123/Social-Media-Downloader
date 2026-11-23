@@ -4,7 +4,7 @@ const downloadSchema = new mongoose.Schema({
   userId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+    required: false,
     index: true,
   },
   platform: {
@@ -41,7 +41,19 @@ const downloadSchema = new mongoose.Schema({
     type: Number,
     default: 0,
   },
+  downloadedBytes: {
+    type: Number,
+    default: 0,
+  },
   storagePath: {
+    type: String,
+    select: false,
+  },
+  cloudinaryUrl: {
+    type: String,
+    select: false,
+  },
+  cloudinaryPublicId: {
     type: String,
     select: false,
   },

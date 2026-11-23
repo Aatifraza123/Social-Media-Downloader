@@ -7,6 +7,27 @@ const settingsSchema = new mongoose.Schema({
     required: true,
     unique: true,
   },
+  // App branding
+  appName: {
+    type: String,
+    default: 'Downloader Pro',
+    maxlength: 50,
+  },
+  appDescription: {
+    type: String,
+    default: 'Private Media Ingestion Console',
+    maxlength: 100,
+  },
+  dashboardSubtitle: {
+    type: String,
+    default: 'Real-time analytics and download management.',
+    maxlength: 120,
+  },
+  loginFooter: {
+    type: String,
+    default: 'Protected by JWT • Private Instance',
+    maxlength: 80,
+  },
   defaultFormat: {
     type: String,
     enum: ['mp4', 'webm', 'mp3', 'm4a'],

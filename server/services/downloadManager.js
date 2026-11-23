@@ -6,6 +6,7 @@ const YouTubeService = require('./platforms/youtube.service');
 const InstagramService = require('./platforms/instagram.service');
 const TwitterService = require('./platforms/twitter.service');
 const PlatformDetector = require('./platforms/platformDetector');
+const cloudinaryService = require('./cloudinary.service');
 const logger = require('../utils/logger');
 const mongoose = require('mongoose');
 
@@ -48,7 +49,7 @@ class DownloadManager {
 
   async startDownload(userId, { url, platform, format = 'mp4', quality = '720p' }) {
     const activeCount = await Download.countDocuments({
-      userId,
+      ...(userId ? { userId } : {}),
       status: { $in: ['pending', 'validating', 'processing', 'downloading'] },
     });
 
@@ -58,22 +59,30 @@ class DownloadManager {
 
     const detected = PlatformDetector.detect(url);
     const actualPlatform = platform || (detected ? detected.platform : 'youtube');
-    const ext = format === 'mp3' ? 'mp3' : (format === 'webm' ? 'webm' : 'mp4');
+    const ext = format === 'mp3' ? 'mp3' : format === 'webm' ? 'webm' : format === 'jpg' ? 'jpg' : 'mp4';
     const fileName = `${uuidv4()}.${ext}`;
     const outputPath = path.join(this.storagePath, fileName);
 
-    const download = await Download.create({
-      userId,
+    const mediaType = ['mp3', 'm4a'].includes(format) || quality === 'audio'
+      ? 'audio'
+      : format === 'jpg' || quality === 'image'
+        ? 'image'
+        : 'video';
+
+    const downloadData = {
       platform: actualPlatform,
       originalUrl: url,
-      mediaType: ['mp3', 'm4a'].includes(format) || quality === 'audio' ? 'audio' : 'video',
+      mediaType,
       format: ext,
-      quality: quality || '720p',
+      quality: quality || 'best',
       fileName,
       storagePath: outputPath,
       status: 'pending',
       progress: 5,
-    });
+    };
+    if (userId) downloadData.userId = userId;
+
+    const download = await Download.create(downloadData);
 
     this.processDownload(download, url, ext, quality, outputPath).catch(err => {
       logger.error(`Download task failure ${download._id}:`, err.message);
@@ -93,8 +102,20 @@ class DownloadManager {
         download.thumbnail = metadata.thumbnail || download.thumbnail;
         download.creator = metadata.creator || download.creator;
         download.duration = metadata.duration || download.duration;
+        
+        // Set estimated file size if available
+        if (metadata.estimatedSize) {
+          download.fileSize = metadata.estimatedSize;
+        }
+        
         await download.save();
+
+        // Block image-only posts if trying to download as video
+        if (metadata.isImagePost && format !== 'jpg' && quality !== 'image') {
+          throw new Error('This Instagram post contains only images and cannot be downloaded as video.');
+        }
       } catch (err) {
+        if (err.message.includes('only images')) throw err;
         logger.warn('Metadata enrichment error in processDownload:', err.message);
       }
 
@@ -114,13 +135,45 @@ class DownloadManager {
         throw new Error(`Downloaded file is too small (${fileSize} bytes). Download likely failed silently.`);
       }
 
+      // Upload to Cloudinary if configured
+      let cloudinaryUrl = null;
+      let cloudinaryPublicId = null;
+      if (process.env.CLOUDINARY_CLOUD_NAME) {
+        try {
+          await this.updateStatus(download._id, 'processing', 80);
+          logger.info(`Uploading to Cloudinary: ${download._id}`);
+          const uploaded = await cloudinaryService.uploadFile(outputPath, {
+            folder: `social-downloader/${download.platform}`,
+            publicId: download._id.toString(),
+          });
+          cloudinaryUrl = uploaded.url;
+          cloudinaryPublicId = uploaded.publicId;
+          logger.info(`Cloudinary upload done: ${cloudinaryUrl}`);
+          // Delete local file after successful upload
+          try { await fs.unlink(outputPath); } catch {}
+        } catch (uploadErr) {
+          logger.warn(`Cloudinary upload failed, keeping local file: ${uploadErr.message}`);
+        }
+      }
+
       download.status = 'completed';
       download.progress = 100;
       download.fileSize = fileSize;
+      download.downloadedBytes = fileSize;
       download.completedAt = new Date();
+      if (cloudinaryUrl) {
+        download.cloudinaryUrl = cloudinaryUrl;
+        download.cloudinaryPublicId = cloudinaryPublicId;
+        download.storagePath = null; // no longer on disk
+      }
       await download.save();
 
-      this.notifyListeners(download._id.toString(), { status: 'completed', progress: 100 });
+      this.notifyListeners(download._id.toString(), { 
+        status: 'completed', 
+        progress: 100,
+        fileSize: fileSize,
+        downloadedBytes: fileSize
+      });
       logger.info(`Download completed: ${download._id}`);
     } catch (err) {
       download.status = 'failed';
@@ -131,13 +184,25 @@ class DownloadManager {
     }
   }
 
-  async updateStatus(downloadId, status, progress) {
-    await Download.findByIdAndUpdate(downloadId, { status, progress });
-    this.notifyListeners(downloadId.toString(), { status, progress });
+  async updateStatus(downloadId, status, progress, extraData = {}) {
+    const updateFields = { status, progress, ...extraData };
+    await Download.findByIdAndUpdate(downloadId, updateFields);
+    
+    // Get current download data for notification
+    const download = await Download.findById(downloadId);
+    this.notifyListeners(downloadId.toString(), { 
+      status, 
+      progress,
+      fileSize: download?.fileSize || 0,
+      downloadedBytes: download?.downloadedBytes || 0,
+      ...extraData
+    });
   }
 
   async cancelDownload(downloadId, userId) {
-    const download = await Download.findOne({ _id: downloadId, userId });
+    const query = { _id: downloadId };
+    if (userId) query.userId = userId;
+    const download = await Download.findOne(query);
     if (!download) throw new Error('Download not found');
     if (['completed', 'cancelled', 'failed'].includes(download.status)) {
       throw new Error(`Cannot cancel a ${download.status} download`);
@@ -168,28 +233,54 @@ class DownloadManager {
   }
 
   async deleteDownload(downloadId, userId) {
-    const download = await Download.findOne({ _id: downloadId, userId }).select('+storagePath');
+    const download = await Download.findOne({ _id: downloadId, userId }).select('+storagePath +cloudinaryPublicId +format');
     if (!download) throw new Error('Download not found');
+
+    // Delete from Cloudinary if stored there
+    if (download.cloudinaryPublicId) {
+      const resourceType = download.format === 'jpg' ? 'image' : 'video';
+      await cloudinaryService.deleteFile(download.cloudinaryPublicId, resourceType);
+    }
+
+    // Delete local file if still exists
     if (download.storagePath) {
       try { await fs.unlink(download.storagePath); } catch {}
     }
+
     await Download.findByIdAndDelete(downloadId);
     return { success: true };
   }
 
   async getFilePath(downloadId, userId) {
-    const download = await Download.findOne({ _id: downloadId, userId }).select('+storagePath');
+    const query = { _id: downloadId };
+    if (userId) query.userId = userId;
+    const download = await Download.findOne(query).select('+storagePath +cloudinaryUrl +cloudinaryPublicId');
     if (!download) throw new Error('Download not found');
+
+    // If stored on Cloudinary, return the URL for redirect
+    if (download.cloudinaryUrl) {
+      return {
+        cloudinaryUrl: download.cloudinaryUrl,
+        fileName: `${(download.title || 'media').replace(/[^a-z0-9]/gi, '_')}.${download.format}`,
+        mimeType: download.format === 'mp3' ? 'audio/mpeg'
+                : download.format === 'jpg' ? 'image/jpeg'
+                : 'video/mp4',
+      };
+    }
+
+    // Fallback: local file
     const resolvedPath = path.resolve(download.storagePath);
     try {
       await fs.access(resolvedPath);
     } catch {
-      throw new Error('File not found on disk. It may have been deleted.');
+      throw new Error('File not found. It may have been deleted.');
     }
     return {
       filePath: resolvedPath,
       fileName: `${(download.title || 'media').replace(/[^a-z0-9]/gi, '_')}.${download.format}`,
-      mimeType: download.format === 'mp3' ? 'audio/mpeg' : 'video/mp4',
+      mimeType: download.format === 'mp3' ? 'audio/mpeg'
+              : download.format === 'jpg' ? 'image/jpeg'
+              : 'video/mp4',
     };
   }
 

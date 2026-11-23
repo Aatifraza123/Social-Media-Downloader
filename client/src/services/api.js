@@ -3,39 +3,24 @@ import axios from 'axios';
 const api = axios.create({
   baseURL: '/api',
   withCredentials: true,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  headers: { 'Content-Type': 'application/json' },
   timeout: 30000,
-});
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
 });
 
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
     const message = error.response?.data?.message || error.message || 'An error occurred';
-    if (error.response?.status === 401) {
-      localStorage.removeItem('token');
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
-      }
-    }
     return Promise.reject({ message, status: error.response?.status, errors: error.response?.data?.errors });
   }
 );
 
 export const authAPI = {
-  login: (data) => api.post('/auth/login', data),
+  login: (credentials) => api.post('/auth/login', credentials),
   logout: () => api.post('/auth/logout'),
   getMe: () => api.get('/auth/me'),
   changePassword: (data) => api.post('/auth/change-password', data),
+  getBranding: () => api.get('/auth/branding'),
 };
 
 export const mediaAPI = {
@@ -48,9 +33,22 @@ export const downloadsAPI = {
   getAll: (params) => api.get('/downloads', { params }),
   getOne: (id) => api.get(`/downloads/${id}`),
   getFileUrl: (id) => `/api/downloads/${id}/file`,
+  getFile: async (id, filename) => {
+    const response = await axios.get(`/api/downloads/${id}/file`, {
+      responseType: 'blob',
+    });
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', filename || 'downloaded-media.mp4');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
   cancel: (id) => api.post(`/downloads/${id}/cancel`),
   retry: (id) => api.post(`/downloads/${id}/retry`),
-  remove: (id) => api.delete(`/downloads/${id}`),
+  delete: (id) => api.delete(`/downloads/${id}`),
 };
 
 export const dashboardAPI = {
@@ -60,11 +58,7 @@ export const dashboardAPI = {
 
 export const settingsAPI = {
   get: () => api.get('/settings'),
-  update: (data) => api.patch('/settings', data),
-};
-
-export const healthAPI = {
-  check: () => api.get('/health'),
+  update: (data) => api.put('/settings', data),
 };
 
 export default api;

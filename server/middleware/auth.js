@@ -6,23 +6,17 @@ const logger = require('../utils/logger');
 const auth = async (req, res, next) => {
   try {
     let token = req.cookies?.token;
-    
-    // Also support Authorization header
-    if (!token && req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
+    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
       token = req.headers.authorization.split(' ')[1];
     }
-    
     if (!token) {
       return ApiResponse.error(res, 'Authentication required', 401);
     }
-
     const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-jwt-key');
     const user = await User.findById(decoded.id);
-    
     if (!user) {
       return ApiResponse.error(res, 'User not found or session invalid', 401);
     }
-
     req.user = user;
     next();
   } catch (error) {
@@ -37,4 +31,23 @@ const auth = async (req, res, next) => {
   }
 };
 
+// Like auth but doesn't block unauthenticated requests — sets req.user if valid token exists
+const optionalAuth = async (req, res, next) => {
+  try {
+    let token = req.cookies?.token;
+    if (!token && req.headers.authorization?.startsWith('Bearer ')) {
+      token = req.headers.authorization.split(' ')[1];
+    }
+    if (token) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret-jwt-key');
+      const user = await User.findById(decoded.id);
+      if (user) req.user = user;
+    }
+  } catch {
+    // Invalid token — treat as guest, don't block
+  }
+  next();
+};
+
 module.exports = auth;
+module.exports.optionalAuth = optionalAuth;

@@ -6,36 +6,26 @@ const fs = require('fs');
 
 exports.getAll = async (req, res) => {
   try {
-    const {
-      page = 1,
-      limit = 20,
-      platform,
-      status,
-      sort = '-createdAt',
-      search,
-    } = req.query;
-
-    const query = { userId: req.user._id };
+    const { page = 1, limit = 20, platform, status, search } = req.query;
+    const query = {};
+    if (req.user && req.user._id) query.userId = req.user._id;
     if (platform && platform !== 'all') query.platform = platform;
     if (status && status !== 'all') query.status = status;
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: 'i' } },
-        { originalUrl: { $regex: search, $options: 'i' } },
-      ];
-    }
+    if (search) query.title = { $regex: search, $options: 'i' };
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const [downloads, total] = await Promise.all([
-      Download.find(query).sort(sort).skip(skip).limit(parseInt(limit)).lean(),
-      Download.countDocuments(query),
-    ]);
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    const total = await Download.countDocuments(query);
+    const downloads = await Download.find(query)
+      .sort({ createdAt: -1 })
+      .skip((pageNum - 1) * limitNum)
+      .limit(limitNum);
 
     return ApiResponse.paginated(res, downloads, {
-      page: parseInt(page),
-      limit: parseInt(limit),
+      page: pageNum,
+      limit: limitNum,
       total,
-      pages: Math.ceil(total / parseInt(limit)),
+      pages: Math.ceil(total / limitNum) || 1,
     });
   } catch (error) {
     logger.error('Get all downloads error:', error);
@@ -45,10 +35,7 @@ exports.getAll = async (req, res) => {
 
 exports.getOne = async (req, res) => {
   try {
-    const download = await Download.findOne({
-      _id: req.params.id,
-      userId: req.user._id,
-    });
+    const download = await Download.findById(req.params.id);
     if (!download) return ApiResponse.error(res, 'Download not found', 404);
     return ApiResponse.success(res, download);
   } catch (error) {
@@ -58,17 +45,19 @@ exports.getOne = async (req, res) => {
 
 exports.getFile = async (req, res) => {
   try {
-    const { filePath, fileName, mimeType } = await downloadManager.getFilePath(
-      req.params.id,
-      req.user._id
+    const { filePath, fileName, mimeType, cloudinaryUrl } = await downloadManager.getFilePath(
+      req.params.id, null
     );
+
+    if (cloudinaryUrl) {
+      const downloadUrl = cloudinaryUrl.replace('/upload/', `/upload/fl_attachment:${fileName.replace(/\./g, '_')}/`);
+      return res.redirect(downloadUrl);
+    }
 
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-
     const stat = fs.statSync(filePath);
     res.setHeader('Content-Length', stat.size);
-
     const stream = fs.createReadStream(filePath);
     stream.pipe(res);
   } catch (error) {
@@ -84,9 +73,14 @@ exports.getProgress = async (req, res) => {
   res.flushHeaders();
 
   const downloadId = req.params.id;
-  const download = await Download.findOne({ _id: downloadId, userId: req.user._id });
+  const download = await Download.findById(downloadId);
   if (download) {
-    res.write(`data: ${JSON.stringify({ status: download.status, progress: download.progress })}\n\n`);
+    res.write(`data: ${JSON.stringify({ 
+      status: download.status, 
+      progress: download.progress,
+      fileSize: download.fileSize || 0,
+      downloadedBytes: download.downloadedBytes || 0
+    })}\n\n`);
   }
 
   downloadManager.addListener(downloadId, res);
@@ -95,27 +89,20 @@ exports.getProgress = async (req, res) => {
 
 exports.cancel = async (req, res) => {
   try {
-    const download = await downloadManager.cancelDownload(req.params.id, req.user._id);
+    const download = await downloadManager.cancelDownload(req.params.id, null);
     return ApiResponse.success(res, download, 'Download cancelled');
   } catch (error) {
     return ApiResponse.error(res, error.message, 400);
   }
 };
 
-exports.retry = async (req, res) => {
+exports.delete = async (req, res) => {
   try {
-    const download = await downloadManager.retryDownload(req.params.id, req.user._id);
-    return ApiResponse.success(res, download, 'Retry scheduled');
+    const download = await Download.findById(req.params.id);
+    if (!download) return ApiResponse.error(res, 'Record not found', 404);
+    await Download.findByIdAndDelete(req.params.id);
+    return ApiResponse.success(res, null, 'Download record deleted');
   } catch (error) {
-    return ApiResponse.error(res, error.message, 400);
-  }
-};
-
-exports.remove = async (req, res) => {
-  try {
-    await downloadManager.deleteDownload(req.params.id, req.user._id);
-    return ApiResponse.success(res, null, 'Download deleted');
-  } catch (error) {
-    return ApiResponse.error(res, error.message, 400);
+    return ApiResponse.error(res, 'Failed to delete record');
   }
 };

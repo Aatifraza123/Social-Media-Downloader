@@ -22,12 +22,9 @@ const settingsRoutes = require('./routes/settings.routes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-app.use(helmet({
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}));
+app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors(corsOptions));
 app.use(cookieParser(process.env.COOKIE_SECRET || 'cookie-secret'));
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -37,17 +34,15 @@ if (process.env.NODE_ENV !== 'test') {
   }));
 }
 
-// Rate limiter on API endpoints
 app.use('/api/', apiLimiter);
 
-// API routes
+// API Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/downloads', downloadRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/settings', settingsRoutes);
 
-// Health check
 app.get('/api/health', (req, res) => {
   res.json({
     success: true,
@@ -60,7 +55,6 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Production client static assets
 if (process.env.NODE_ENV === 'production') {
   const clientBuild = path.join(__dirname, '..', 'client', 'dist');
   app.use(express.static(clientBuild));
@@ -77,29 +71,23 @@ const startServer = async () => {
   try {
     await connectDB();
     await downloadManager.init();
-
     const server = app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
     });
-
     server.on('error', (err) => {
       if (err.code === 'EADDRINUSE') {
-        logger.error(`Port ${PORT} is already in use. Kill the existing process or change PORT in .env`);
+        logger.error(`Port ${PORT} is already in use.`);
       } else {
-        logger.error('Server listener error:', err.message);
+        logger.error('Server error:', err.message);
       }
       process.exit(1);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);
-    if (process.env.NODE_ENV !== 'test') {
-      process.exit(1);
-    }
+    if (process.env.NODE_ENV !== 'test') process.exit(1);
   }
 };
 
-if (process.env.NODE_ENV !== 'test') {
-  startServer();
-}
+if (process.env.NODE_ENV !== 'test') startServer();
 
 module.exports = app;

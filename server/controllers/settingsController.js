@@ -3,6 +3,34 @@ const ActivityLog = require('../models/ActivityLog');
 const ApiResponse = require('../utils/ApiResponse');
 const logger = require('../utils/logger');
 
+exports.getBranding = async (req, res) => {
+  try {
+    // Return branding from first admin user's settings
+    const User = require('../models/User');
+    const admin = await User.findOne({ role: 'admin' });
+    let branding = {
+      appName: 'Downloader Pro',
+      appDescription: 'Private Media Ingestion Console',
+      loginFooter: 'Protected by JWT • Private Instance',
+    };
+    if (admin) {
+      const settings = await Settings.findOne({ userId: admin._id });
+      if (settings) {
+        branding.appName = settings.appName || branding.appName;
+        branding.appDescription = settings.appDescription || branding.appDescription;
+        branding.loginFooter = settings.loginFooter || branding.loginFooter;
+      }
+    }
+    return ApiResponse.success(res, branding);
+  } catch (error) {
+    return ApiResponse.success(res, {
+      appName: 'Downloader Pro',
+      appDescription: 'Private Media Ingestion Console',
+      loginFooter: 'Protected by JWT • Private Instance',
+    });
+  }
+};
+
 exports.getSettings = async (req, res) => {
   try {
     let settings = await Settings.findOne({ userId: req.user._id });
@@ -19,6 +47,7 @@ exports.getSettings = async (req, res) => {
 exports.updateSettings = async (req, res) => {
   try {
     const allowed = [
+      'appName', 'appDescription', 'dashboardSubtitle', 'loginFooter',
       'defaultFormat', 'preferredQuality', 'maxConcurrentDownloads',
       'fileRetentionDays', 'autoCleanup', 'theme', 'animationsEnabled',
     ];

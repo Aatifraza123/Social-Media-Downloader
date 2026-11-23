@@ -27,7 +27,7 @@ exports.download = async (req, res) => {
     const { url, platform, format, quality } = req.body;
     await validateUrl(url);
 
-    const download = await downloadManager.startDownload(req.user._id, {
+    const download = await downloadManager.startDownload(null, {
       url, platform, format, quality,
     });
 
@@ -55,16 +55,10 @@ exports.batchDownload = async (req, res) => {
           results.push({ url, success: false, error: 'Unsupported URL' });
           continue;
         }
-
-        const download = await downloadManager.startDownload(req.user._id, {
+        const download = await downloadManager.startDownload(null, {
           url, platform: detected.platform,
         });
-        results.push({
-          url,
-          success: true,
-          downloadId: download._id,
-          status: download.status,
-        });
+        results.push({ url, success: true, downloadId: download._id, status: download.status });
       } catch (err) {
         results.push({ url, success: false, error: err.message });
       }

@@ -8,6 +8,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   const checkAuth = useCallback(async () => {
+    // Clean up any legacy token stored in localStorage
+    localStorage.removeItem('token');
     try {
       const response = await authAPI.getMe();
       if (response.success) {
@@ -27,9 +29,6 @@ export function AuthProvider({ children }) {
   const login = async (email, password) => {
     const response = await authAPI.login({ email, password });
     if (response.success) {
-      if (response.data.token) {
-        localStorage.setItem('token', response.data.token);
-      }
       setUser(response.data.user);
     }
     return response;
@@ -39,7 +38,6 @@ export function AuthProvider({ children }) {
     try {
       await authAPI.logout();
     } catch {}
-    localStorage.removeItem('token');
     setUser(null);
   };
 

@@ -4,11 +4,10 @@ const downloadController = require('../controllers/downloadController');
 const auth = require('../middleware/auth');
 
 router.get('/', auth, downloadController.getAll);
-router.get('/:id', auth, downloadController.getOne);
-router.get('/:id/file', auth, downloadController.getFile);
-router.get('/:id/progress', auth, downloadController.getProgress);
-router.post('/:id/cancel', auth, downloadController.cancel);
-router.post('/:id/retry', auth, downloadController.retry);
-router.delete('/:id', auth, downloadController.remove);
+router.get('/:id', downloadController.getOne);
+router.get('/:id/file', downloadController.getFile);
+router.get('/:id/progress', downloadController.getProgress);
+router.post('/:id/cancel', downloadController.cancel);
+router.delete('/:id', auth, downloadController.delete);
 
 module.exports = router;

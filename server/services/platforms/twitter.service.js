@@ -29,9 +29,9 @@ class TwitterService {
       originalUrl: url,
       type: 'tweet',
       title: `X Post (${tweetId})`,
-      creator: 'X Creator',
-      duration: '0:45',
-      thumbnail: 'https://images.unsplash.com/photo-1611605698335-8b1569810432?w=640&q=80',
+      creator: '',
+      duration: null,
+      thumbnail: null,
       availableFormats: [
         { formatId: 'best-mp4', quality: 'best', format: 'mp4', label: 'Best Quality MP4', mediaType: 'video' },
         { formatId: '720p', quality: '720p', format: 'mp4', label: '720p MP4', mediaType: 'video' },
@@ -51,6 +51,46 @@ class TwitterService {
       if (info.title) metadata.title = info.title;
       if (info.uploader) metadata.creator = info.uploader;
       if (info.thumbnail) metadata.thumbnail = info.thumbnail;
+      
+      // Extract file sizes from formats
+      if (info.formats && Array.isArray(info.formats)) {
+        const formatSizeMap = {};
+        
+        // Find best video format
+        const videoFormats = info.formats.filter(fmt => fmt.vcodec !== 'none' && fmt.filesize);
+        if (videoFormats.length > 0) {
+          const bestVideo = videoFormats.reduce((best, curr) => 
+            (curr.filesize || 0) > (best.filesize || 0) ? curr : best
+          );
+          formatSizeMap['best'] = bestVideo.filesize;
+          
+          // Find 720p if available
+          const video720p = videoFormats.find(fmt => fmt.height === 720);
+          if (video720p && video720p.filesize) {
+            formatSizeMap['720p'] = video720p.filesize;
+          }
+        }
+        
+        // Find audio formats
+        const audioFormats = info.formats.filter(fmt => 
+          fmt.acodec !== 'none' && fmt.vcodec === 'none' && fmt.filesize
+        );
+        if (audioFormats.length > 0) {
+          const bestAudio = audioFormats.reduce((best, curr) => 
+            (curr.filesize || 0) > (best.filesize || 0) ? curr : best
+          );
+          formatSizeMap['audio'] = bestAudio.filesize;
+        }
+        
+        // Update availableFormats with file sizes
+        metadata.availableFormats = metadata.availableFormats.map(fmt => {
+          const sizeKey = fmt.quality === 'audio' ? 'audio' : fmt.quality;
+          if (formatSizeMap[sizeKey]) {
+            return { ...fmt, fileSize: formatSizeMap[sizeKey] };
+          }
+          return fmt;
+        });
+      }
     } catch {
       // Graceful fallback to default metadata
     }
