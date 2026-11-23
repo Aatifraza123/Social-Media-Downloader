@@ -17,122 +17,90 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    @apply bg-zinc-50 dark:bg-[#090a0d] text-zinc-900 dark:text-zinc-100;
   }
 
-  /* Custom minimal modern scrollbar */
+  /* Minimal aesthetic scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
   }
-
   ::-webkit-scrollbar-track {
     background: transparent;
   }
-
   ::-webkit-scrollbar-thumb {
     background: #d4d4d8;
     border-radius: 9999px;
   }
-
   .dark ::-webkit-scrollbar-thumb {
     background: #27272a;
   }
-
   ::-webkit-scrollbar-thumb:hover {
     background: #a1a1aa;
   }
-
   .dark ::-webkit-scrollbar-thumb:hover {
     background: #3f3f46;
   }
 }
 
 @layer components {
-  /* Premium SaaS Cards */
-  .saas-card {
-    @apply bg-white dark:bg-[#111215] border border-zinc-200 dark:border-white/[0.08] rounded-2xl shadow-sm dark:shadow-[0_4px_24px_rgba(0,0,0,0.5)];
+  /* Clean, Minimal Premium Cards */
+  .clean-card {
+    @apply bg-white dark:bg-[#121318] border border-zinc-200/90 dark:border-white/[0.08] rounded-2xl shadow-sm dark:shadow-none;
   }
 
-  .saas-card-subtle {
-    @apply bg-zinc-50/80 dark:bg-[#16171b] border border-zinc-200/80 dark:border-white/[0.06] rounded-xl;
+  .clean-card-hover {
+    @apply bg-white dark:bg-[#121318] border border-zinc-200/90 dark:border-white/[0.08] rounded-2xl shadow-sm dark:shadow-none
+           hover:border-zinc-300 dark:hover:border-white/[0.18] transition-all duration-200;
   }
 
-  .saas-card-interactive {
-    @apply bg-white dark:bg-[#111215] border border-zinc-200 dark:border-white/[0.08] rounded-2xl shadow-sm dark:shadow-[0_4px_20px_rgba(0,0,0,0.4)]
-           hover:border-zinc-300 dark:hover:border-white/[0.16] hover:shadow-md transition-all duration-200;
-  }
-
-  /* High-end SaaS Buttons */
+  /* Buttons - Clean, purposeful, beautiful */
   .btn-primary {
-    @apply inline-flex items-center justify-center font-medium text-sm rounded-xl px-4 py-2.5
-           bg-gradient-to-b from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white
-           shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.2)]
-           active:scale-[0.98] transition-all duration-150
-           disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none;
+    @apply inline-flex items-center justify-center font-medium text-sm rounded-xl px-5 py-2.5
+           bg-zinc-900 hover:bg-zinc-800 text-white
+           dark:bg-white dark:hover:bg-zinc-100 dark:text-zinc-900
+           shadow-sm active:scale-[0.98] transition-all duration-150
+           disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none;
+  }
+
+  .btn-accent {
+    @apply inline-flex items-center justify-center font-medium text-sm rounded-xl px-5 py-2.5
+           bg-blue-600 hover:bg-blue-700 text-white
+           shadow-sm active:scale-[0.98] transition-all duration-150
+           disabled:opacity-40 disabled:cursor-not-allowed;
   }
 
   .btn-secondary {
     @apply inline-flex items-center justify-center font-medium text-sm rounded-xl px-4 py-2.5
-           bg-zinc-100 hover:bg-zinc-200 text-zinc-900
-           dark:bg-white/[0.05] dark:hover:bg-white/[0.09] dark:text-zinc-200
+           bg-zinc-100 hover:bg-zinc-200/80 text-zinc-800
+           dark:bg-white/[0.06] dark:hover:bg-white/[0.1] dark:text-zinc-200
            border border-zinc-200 dark:border-white/[0.08]
            active:scale-[0.98] transition-all duration-150
-           disabled:opacity-50 disabled:cursor-not-allowed;
+           disabled:opacity-40 disabled:cursor-not-allowed;
   }
 
   .btn-ghost {
-    @apply inline-flex items-center justify-center font-medium text-sm rounded-lg px-3 py-2
+    @apply inline-flex items-center justify-center font-medium text-sm rounded-xl px-3 py-2
            text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100
-           dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-white/[0.06]
+           dark:text-zinc-400 dark:hover:text-white dark:hover:bg-white/[0.06]
            transition-colors duration-150;
   }
 
-  .btn-danger {
-    @apply inline-flex items-center justify-center font-medium text-sm rounded-xl px-3.5 py-2
-           bg-red-50 hover:bg-red-100 text-red-600
-           dark:bg-red-950/40 dark:hover:bg-red-900/60 dark:text-red-400
-           border border-red-200 dark:border-red-900/50
-           transition-colors duration-150;
-  }
-
-  /* Crisp SaaS Input */
+  /* Form Inputs - Clean, crisp border focus */
   .input-field {
-    @apply w-full px-4 py-2.5 text-sm rounded-xl
-           bg-white dark:bg-[#15161a]
-           border border-zinc-200 dark:border-white/[0.1]
-           text-zinc-900 dark:text-zinc-100
-           placeholder-zinc-400 dark:placeholder-zinc-500
-           focus:outline-none focus:border-indigo-500 dark:focus:border-indigo-500
-           focus:ring-2 focus:ring-indigo-500/20
+    @apply w-full rounded-xl border border-zinc-200 dark:border-white/[0.1]
+           bg-white dark:bg-[#15161c] px-4 py-2.5 text-sm
+           text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500
+           focus:outline-none focus:border-zinc-400 dark:focus:border-white/[0.3]
+           focus:ring-2 focus:ring-zinc-900/5 dark:focus:ring-white/[0.05]
            transition-all duration-150;
   }
 
-  /* Refined Navigation */
-  .sidebar-link {
-    @apply flex items-center gap-3 px-3.5 py-2.5 text-sm font-medium rounded-xl
-           text-zinc-600 dark:text-zinc-400
-           hover:text-zinc-900 dark:hover:text-zinc-100
-           hover:bg-zinc-100 dark:hover:bg-white/[0.05]
-           transition-all duration-150;
+  /* Legacy aliases for backwards compatibility */
+  .saas-card {
+    @apply clean-card;
   }
-
-  .sidebar-link.active {
-    @apply text-indigo-600 dark:text-white
-           bg-indigo-50 dark:bg-indigo-500/10
-           border border-indigo-200/60 dark:border-indigo-500/20
-           font-semibold;
-  }
-
-  /* SaaS Pill Badges */
-  .badge {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium
-           border border-zinc-200 dark:border-white/[0.08]
-           bg-zinc-100 dark:bg-white/[0.04] text-zinc-700 dark:text-zinc-300;
-  }
-
-  .badge-success {
-    @apply inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium
-           border border-emerald-200 dark:border-emerald-500/20
-           bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400;
+  .saas-card-interactive {
+    @apply clean-card-hover;
   }
 }
