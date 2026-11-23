@@ -7,12 +7,12 @@ import {
   LayoutDashboard,
   Moon,
   Sun,
-  Sparkles,
   Menu,
   X,
   LogIn,
   LogOut,
-  User,
+  Shield,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -23,16 +23,24 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const location = useLocation();
 
-  const navLinks = [
+  // Public Links (Visible for Everyone)
+  const publicLinks = [
     { to: '/', label: 'Downloader', icon: Download },
     { to: '/batch', label: 'Batch Queue', icon: Layers },
+  ];
+
+  // Admin-Only Links
+  const adminLinks = [
     { to: '/history', label: 'Recent Downloads', icon: Clock },
     { to: '/dashboard', label: 'Analytics', icon: LayoutDashboard },
+    { to: '/settings', label: 'Settings', icon: SettingsIcon },
   ];
+
+  const visibleLinks = user ? [...publicLinks, ...adminLinks] : publicLinks;
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-zinc-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-[#090a0d]/80 backdrop-blur-md">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
         {/* Brand Logo */}
         <Link to="/" className="flex items-center gap-2.5 group">
           <div className="w-8 h-8 rounded-xl bg-zinc-900 dark:bg-white text-white dark:text-zinc-900 flex items-center justify-center font-bold shadow-sm transition-transform group-hover:scale-105">
@@ -50,14 +58,14 @@ export default function Navbar() {
 
         {/* Desktop Navigation Links */}
         <nav className="hidden md:flex items-center gap-1">
-          {navLinks.map((item) => {
+          {visibleLinks.map((item) => {
             const Icon = item.icon;
             const active = location.pathname === item.to || (item.to === '/' && location.pathname === '/downloader');
             return (
               <NavLink
                 key={item.to}
                 to={item.to}
-                className={`flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
                   active
                     ? 'bg-zinc-100 dark:bg-white/[0.08] text-zinc-900 dark:text-white font-semibold'
                     : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-50 dark:hover:bg-white/[0.04]'
@@ -70,7 +78,7 @@ export default function Navbar() {
           })}
         </nav>
 
-        {/* Right Actions: Theme Toggle & Admin Access */}
+        {/* Right Actions */}
         <div className="flex items-center gap-2">
           <button
             onClick={toggleTheme}
@@ -82,12 +90,12 @@ export default function Navbar() {
 
           {user ? (
             <div className="flex items-center gap-2">
-              <span className="hidden sm:inline-block text-xs font-medium text-zinc-500 dark:text-zinc-400 font-mono">
-                {user.email?.split('@')[0]}
+              <span className="hidden sm:inline-block text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                Admin
               </span>
               <button
                 onClick={logout}
-                className="btn-ghost text-xs p-2"
+                className="btn-ghost text-xs p-2 text-zinc-500 hover:text-rose-500"
                 title="Sign out"
               >
                 <LogOut className="w-4 h-4" />
@@ -96,10 +104,10 @@ export default function Navbar() {
           ) : (
             <Link
               to="/login"
-              className="btn-secondary py-1.5 px-3 text-xs gap-1.5 hidden sm:inline-flex"
+              className="btn-secondary py-1.5 px-3 text-xs gap-1.5"
             >
-              <User className="w-3.5 h-3.5 text-zinc-400" />
-              <span>Admin</span>
+              <Shield className="w-3.5 h-3.5 text-zinc-400" />
+              <span>Admin Login</span>
             </Link>
           )}
 
@@ -116,7 +124,7 @@ export default function Navbar() {
       {/* Mobile Dropdown Menu */}
       {mobileMenuOpen && (
         <div className="md:hidden border-b border-zinc-200 dark:border-white/[0.08] bg-white dark:bg-[#090a0d] px-4 py-3 space-y-1">
-          {navLinks.map((item) => {
+          {visibleLinks.map((item) => {
             const Icon = item.icon;
             const active = location.pathname === item.to || (item.to === '/' && location.pathname === '/downloader');
             return (
