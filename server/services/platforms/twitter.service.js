@@ -4,6 +4,18 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
 
+function cookiesArg() {
+  if (process.env.X_COOKIES_FILE) return `--cookies "${process.env.X_COOKIES_FILE}"`;
+  if (process.env.COOKIES_FILE) return `--cookies "${process.env.COOKIES_FILE}"`;
+  if (process.env.COOKIES_BROWSER) return `--cookies-from-browser ${process.env.COOKIES_BROWSER}`;
+  return '';
+}
+
+function jsRuntimeArg() {
+  if (process.env.DENO_PATH) return `--js-runtimes "deno:${process.env.DENO_PATH}"`;
+  return '';
+}
+
 class TwitterService {
   static async analyze(url) {
     const tweetId = PlatformDetector.extractVideoId(url, 'twitter');
@@ -31,13 +43,16 @@ class TwitterService {
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
     try {
       const normalized = url.replace('x.com', 'twitter.com');
-      const { stdout } = await execAsync(`${ytdlpPath} --dump-json --no-download "${normalized}"`, { timeout: 10000 });
+      const { stdout } = await execAsync(
+        `"${ytdlpPath}" ${cookiesArg()} ${jsRuntimeArg()} --dump-json --no-download "${normalized}"`,
+        { timeout: 15000 }
+      );
       const info = JSON.parse(stdout);
       if (info.title) metadata.title = info.title;
       if (info.uploader) metadata.creator = info.uploader;
       if (info.thumbnail) metadata.thumbnail = info.thumbnail;
     } catch {
-      // Graceful fallback
+      // Graceful fallback to default metadata
     }
 
     return metadata;
@@ -45,20 +60,20 @@ class TwitterService {
 
   static async download(url, format = 'mp4', quality = 'best', outputPath) {
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
+    const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
     const normalized = url.replace('x.com', 'twitter.com');
-    let formatArg = format === 'mp3' || quality === 'audio' ? '-x --audio-format mp3' : `-f "best" --merge-output-format ${format}`;
-    const command = `${ytdlpPath} ${formatArg} -o "${outputPath}" --no-playlist "${normalized}"`;
+
+    let formatArg = format === 'mp3' || quality === 'audio'
+      ? '-x --audio-format mp3'
+      : `-f "best" --merge-output-format ${format}`;
+
+    const command = `"${ytdlpPath}" --ffmpeg-location "${ffmpegPath}" ${cookiesArg()} ${jsRuntimeArg()} ${formatArg} -o "${outputPath}" --no-playlist "${normalized}"`;
     logger.info(`Twitter download: ${command}`);
 
     try {
       return await execAsync(command, { timeout: 300000 });
     } catch (err) {
-      if (process.env.NODE_ENV !== 'production') {
-        const fs = require('fs');
-        fs.writeFileSync(outputPath, Buffer.from('Mock Twitter Download for ' + url));
-        return { stdout: 'Mock download complete' };
-      }
-      throw new Error(`Twitter media download failed: ${err.message}`);
+      throw new Error(`Twitter media download failed: ${err.stderr || err.message}`);
     }
   }
 }

@@ -2,8 +2,8 @@ export const PLATFORMS = {
   youtube: {
     name: 'YouTube',
     icon: 'youtube',
-    color: '#FF0000',
-    bgColor: 'bg-red-500/10 text-red-400 border-red-500/30',
+    color: '#ef4444',
+    badgeClass: 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-400 border border-red-200 dark:border-red-900/40',
     patterns: [
       /^https?:\/\/(www\.)?youtube\.com\/watch\?v=[\w-]+/i,
       /^https?:\/\/(www\.)?youtube\.com\/shorts\/[\w-]+/i,
@@ -14,8 +14,8 @@ export const PLATFORMS = {
   instagram: {
     name: 'Instagram',
     icon: 'instagram',
-    color: '#E4405F',
-    bgColor: 'bg-pink-500/10 text-pink-400 border-pink-500/30',
+    color: '#ec4899',
+    badgeClass: 'bg-pink-50 text-pink-700 dark:bg-pink-950/40 dark:text-pink-400 border border-pink-200 dark:border-pink-900/40',
     patterns: [
       /^https?:\/\/(www\.)?instagram\.com\/reel\/[\w-]+/i,
       /^https?:\/\/(www\.)?instagram\.com\/p\/[\w-]+/i,
@@ -25,8 +25,8 @@ export const PLATFORMS = {
   twitter: {
     name: 'X (Twitter)',
     icon: 'twitter',
-    color: '#38bdf8',
-    bgColor: 'bg-sky-500/10 text-sky-400 border-sky-500/30',
+    color: '#0ea5e9',
+    badgeClass: 'bg-sky-50 text-sky-700 dark:bg-sky-950/40 dark:text-sky-400 border border-sky-200 dark:border-sky-900/40',
     patterns: [
       /^https?:\/\/(www\.)?twitter\.com\/\w+\/status\/\d+/i,
       /^https?:\/\/(www\.)?x\.com\/\w+\/status\/\d+/i,

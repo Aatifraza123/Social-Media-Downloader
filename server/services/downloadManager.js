@@ -103,15 +103,15 @@ class DownloadManager {
 
       await service.download(url, format, quality, outputPath);
 
-      let fileSize = 1024 * 1024 * 15; // default 15MB fallback
+      let stat;
       try {
-        const stat = await fs.stat(outputPath);
-        fileSize = stat.size;
+        stat = await fs.stat(outputPath);
       } catch {
-        // Fallback file creation if missing
-        await fs.writeFile(outputPath, Buffer.from(`Media downloaded for ${url}`));
-        const stat = await fs.stat(outputPath);
-        fileSize = stat.size;
+        throw new Error('Download file not found after yt-dlp completed. The file may have failed to save.');
+      }
+      const fileSize = stat.size;
+      if (fileSize < 1000) {
+        throw new Error(`Downloaded file is too small (${fileSize} bytes). Download likely failed silently.`);
       }
 
       download.status = 'completed';
@@ -184,7 +184,7 @@ class DownloadManager {
     try {
       await fs.access(resolvedPath);
     } catch {
-      await fs.writeFile(resolvedPath, Buffer.from(`Generated content for ${download.title}`));
+      throw new Error('File not found on disk. It may have been deleted.');
     }
     return {
       filePath: resolvedPath,

@@ -34,36 +34,31 @@ export default function DownloadProgress({ downloadId, onComplete }) {
     };
   }, [downloadId, onComplete]);
 
-  const getStatusColor = () => {
-    switch (data.status) {
-      case 'completed': return 'from-emerald-500 to-teal-500';
-      case 'failed': return 'from-red-500 to-rose-600';
-      case 'cancelled': return 'from-gray-500 to-slate-600';
-      default: return 'from-indigo-500 via-purple-500 to-pink-500';
-    }
-  };
-
   return (
-    <div className="glass-card p-6 border-white/20 bg-navy-900/80 shadow-2xl space-y-4">
+    <div className="minimal-card p-5 sm:p-6 space-y-3.5">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           {data.status === 'completed' ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
           ) : data.status === 'failed' ? (
-            <AlertTriangle className="w-5 h-5 text-red-400" />
+            <AlertTriangle className="w-4 h-4 text-red-600 dark:text-red-400" />
           ) : data.status === 'cancelled' ? (
-            <XCircle className="w-5 h-5 text-gray-400" />
+            <XCircle className="w-4 h-4 text-zinc-500" />
           ) : (
-            <Loader2 className="w-5 h-5 text-indigo-400 animate-spin" />
+            <Loader2 className="w-4 h-4 text-zinc-600 dark:text-zinc-400 animate-spin" />
           )}
-          <span className="font-semibold text-white capitalize">Status: {data.status}</span>
+          <span className="text-sm font-medium text-zinc-900 dark:text-zinc-100 capitalize">
+            {data.status === 'completed' ? 'Download Ready' : `Status: ${data.status}`}
+          </span>
         </div>
-        <span className="text-sm font-mono text-indigo-300 font-bold">{data.progress || 0}%</span>
+        <span className="text-xs font-mono font-semibold text-zinc-600 dark:text-zinc-400">
+          {data.progress || 0}%
+        </span>
       </div>
 
-      <div className="w-full bg-white/10 rounded-full h-3 overflow-hidden p-0.5 border border-white/10">
+      <div className="w-full bg-zinc-100 dark:bg-zinc-800 rounded-full h-2 overflow-hidden">
         <div
-          className={`h-full rounded-full bg-gradient-to-r ${getStatusColor()} transition-all duration-300`}
+          className="h-full bg-zinc-900 dark:bg-zinc-100 transition-all duration-300 rounded-full"
           style={{ width: `${data.progress || 5}%` }}
         />
       </div>
@@ -71,14 +66,15 @@ export default function DownloadProgress({ downloadId, onComplete }) {
       {data.status === 'completed' && (
         <a
           href={downloadsAPI.getFileUrl(downloadId)}
-          className="btn-primary w-full py-3 flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
+          className="btn-primary w-full py-2.5 gap-2 text-sm mt-2"
         >
-          <Download className="w-4 h-4" /> Save File to Device
+          <Download className="w-4 h-4" />
+          <span>Save File to Device</span>
         </a>
       )}
 
       {data.error && (
-        <p className="text-xs text-red-400 bg-red-500/10 p-2.5 rounded-lg border border-red-500/20">
+        <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 p-2.5 rounded-lg border border-red-200 dark:border-red-900/50">
           {data.error}
         </p>
       )}

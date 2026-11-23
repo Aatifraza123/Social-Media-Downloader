@@ -35,7 +35,7 @@ class YouTubeService {
     // Attempt real metadata probe if yt-dlp is available
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
     try {
-      const { stdout } = await execAsync(`${ytdlpPath} --dump-json --no-download "${url}"`, { timeout: 10000 });
+      const { stdout } = await execAsync(`"${ytdlpPath}" --dump-json --no-download "${url}"`, { timeout: 10000 });
       const info = JSON.parse(stdout);
       if (info.title) metadata.title = info.title;
       if (info.uploader || info.channel) metadata.creator = info.uploader || info.channel;
@@ -50,27 +50,24 @@ class YouTubeService {
 
   static async download(url, format = 'mp4', quality = 'best', outputPath) {
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
+    const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
+    const ffmpegArg = `--ffmpeg-location "${ffmpegPath}"`;
+
     let formatArg = '';
     if (quality === 'audio' || format === 'mp3' || format === 'm4a') {
-      formatArg = '-x --audio-format mp3 --audio-quality 0';
+      formatArg = `-x --audio-format mp3 --audio-quality 0`;
     } else {
       const height = parseInt(quality) || 720;
       formatArg = `-f "bestvideo[height<=${height}]+bestaudio/best[height<=${height}]" --merge-output-format ${format}`;
     }
 
-    const command = `${ytdlpPath} ${formatArg} -o "${outputPath}" --no-playlist "${url}"`;
+    const command = `"${ytdlpPath}" ${ffmpegArg} ${formatArg} -o "${outputPath}" --no-playlist "${url}"`;
     logger.info(`Executing download: ${command}`);
 
     try {
       return await execAsync(command, { timeout: 300000 });
     } catch (err) {
-      // If yt-dlp is not on system path, create mock output for development testing if allowed
-      if (process.env.NODE_ENV !== 'production') {
-        const fs = require('fs');
-        fs.writeFileSync(outputPath, Buffer.from('Mock Download Data for ' + url));
-        return { stdout: 'Mock download complete' };
-      }
-      throw new Error(`Download tool execution failed: ${err.message}`);
+      throw new Error(`yt-dlp failed: ${err.stderr || err.message}`);
     }
   }
 }

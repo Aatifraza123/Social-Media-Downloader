@@ -78,8 +78,17 @@ const startServer = async () => {
     await connectDB();
     await downloadManager.init();
 
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
+    });
+
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        logger.error(`Port ${PORT} is already in use. Kill the existing process or change PORT in .env`);
+      } else {
+        logger.error('Server listener error:', err.message);
+      }
+      process.exit(1);
     });
   } catch (error) {
     logger.error('Failed to start server:', error);

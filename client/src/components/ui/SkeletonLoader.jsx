@@ -2,12 +2,12 @@ import React from 'react';
 
 export function SkeletonCard() {
   return (
-    <div className="glass-card p-6 animate-pulse">
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 bg-white/10 rounded-xl" />
-        <div className="flex-1 space-y-2">
-          <div className="h-4 bg-white/10 rounded w-3/4" />
-          <div className="h-3 bg-white/10 rounded w-1/2" />
+    <div className="minimal-card p-5 animate-pulse">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 bg-zinc-200 dark:bg-zinc-800 rounded-lg" />
+        <div className="flex-1 space-y-1.5">
+          <div className="h-3.5 bg-zinc-200 dark:bg-zinc-800 rounded w-3/4" />
+          <div className="h-2.5 bg-zinc-200 dark:bg-zinc-800 rounded w-1/2" />
         </div>
       </div>
     </div>
@@ -16,11 +16,11 @@ export function SkeletonCard() {
 
 export function SkeletonStats() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="glass-card p-6 animate-pulse space-y-3">
-          <div className="h-4 bg-white/10 rounded w-1/2" />
-          <div className="h-8 bg-white/10 rounded w-2/3" />
+        <div key={i} className="minimal-card p-4 sm:p-5 animate-pulse space-y-2">
+          <div className="h-3 bg-zinc-200 dark:bg-zinc-800 rounded w-1/3" />
+          <div className="h-6 bg-zinc-200 dark:bg-zinc-800 rounded w-1/2" />
         </div>
       ))}
     </div>

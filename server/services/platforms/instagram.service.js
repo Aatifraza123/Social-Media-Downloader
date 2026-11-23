@@ -4,6 +4,13 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const execAsync = promisify(exec);
 
+function cookiesArg() {
+  if (process.env.INSTAGRAM_COOKIES_FILE) return `--cookies "${process.env.INSTAGRAM_COOKIES_FILE}"`;
+  if (process.env.COOKIES_FILE) return `--cookies "${process.env.COOKIES_FILE}"`;
+  if (process.env.COOKIES_BROWSER) return `--cookies-from-browser ${process.env.COOKIES_BROWSER}`;
+  return '';
+}
+
 class InstagramService {
   static async analyze(url) {
     const contentId = PlatformDetector.extractVideoId(url, 'instagram');
@@ -29,14 +36,18 @@ class InstagramService {
     };
 
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
+    const cleanUrl = url.split('?')[0];
     try {
-      const { stdout } = await execAsync(`${ytdlpPath} --dump-json --no-download "${url}"`, { timeout: 10000 });
+      const { stdout } = await execAsync(
+        `"${ytdlpPath}" ${cookiesArg()} --dump-json --no-download "${cleanUrl}"`,
+        { timeout: 15000 }
+      );
       const info = JSON.parse(stdout);
       if (info.title) metadata.title = info.title;
       if (info.uploader) metadata.creator = info.uploader;
       if (info.thumbnail) metadata.thumbnail = info.thumbnail;
     } catch {
-      // Graceful fallback
+      // Graceful fallback to default metadata
     }
 
     return metadata;
@@ -44,19 +55,23 @@ class InstagramService {
 
   static async download(url, format = 'mp4', quality = 'best', outputPath) {
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
-    let formatArg = format === 'mp3' || quality === 'audio' ? '-x --audio-format mp3' : `-f "best" --merge-output-format ${format}`;
-    const command = `${ytdlpPath} ${formatArg} -o "${outputPath}" --no-playlist "${url}"`;
+    const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
+
+    // Instagram provides pre-merged formats — no need for --merge-output-format
+    let formatArg = format === 'mp3' || quality === 'audio'
+      ? '-x --audio-format mp3'
+      : `-f "best"`;
+
+    // Strip tracking params from URL
+    const cleanUrl = url.split('?')[0];
+
+    const command = `"${ytdlpPath}" --ffmpeg-location "${ffmpegPath}" ${cookiesArg()} ${formatArg} -o "${outputPath}" --no-playlist "${cleanUrl}"`;
     logger.info(`Instagram download: ${command}`);
 
     try {
       return await execAsync(command, { timeout: 300000 });
     } catch (err) {
-      if (process.env.NODE_ENV !== 'production') {
-        const fs = require('fs');
-        fs.writeFileSync(outputPath, Buffer.from('Mock Instagram Download for ' + url));
-        return { stdout: 'Mock download complete' };
-      }
-      throw new Error(`Instagram download failed: ${err.message}`);
+      throw new Error(`Instagram download failed: ${err.stderr || err.message}`);
     }
   }
 }

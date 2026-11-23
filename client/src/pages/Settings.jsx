@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useSettings, useUpdateSettings } from '../hooks/useDownloads';
 import { authAPI } from '../services/api';
-import { Settings as SettingsIcon, Shield, HardDrive, KeyRound, Check } from 'lucide-react';
+import { HardDrive, KeyRound, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function Settings() {
@@ -42,48 +42,51 @@ export default function Settings() {
   };
 
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
+    <div className="space-y-6 max-w-3xl mx-auto">
       <div>
-        <h1 className="text-2xl sm:text-3xl font-bold font-display text-white">
-          System Preferences
+        <h1 className="text-xl sm:text-2xl font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
+          System Settings
         </h1>
-        <p className="text-sm text-gray-400 mt-1">
-          Configure default formats, security keys, and automated storage maintenance.
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+          Configure default formats, retention durations, and security keys.
         </p>
       </div>
 
       {/* Ingestion & Retention */}
-      <div className="glass-card p-6 border-white/10 shadow-xl">
-        <h3 className="text-base font-semibold text-white flex items-center gap-2 mb-4">
-          <HardDrive className="w-5 h-5 text-indigo-400" />
+      <div className="minimal-card p-5 sm:p-6">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2 mb-1">
+          <HardDrive className="w-4 h-4 text-zinc-500" />
           Download & Storage Policies
         </h3>
+        <p className="text-xs text-zinc-500 mb-4">
+          Control concurrency and automated file retention on this VPS node.
+        </p>
 
-        <form onSubmit={handleSavePreferences} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form onSubmit={handleSavePreferences} className="space-y-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                 Default Video Format
               </label>
               <select
                 name="defaultFormat"
                 defaultValue={settings.defaultFormat || 'mp4'}
-                className="input-field bg-navy-900 border-white/15"
+                className="input-field text-xs"
               >
-                <option value="mp4">MP4 (Recommended)</option>
+                <option value="mp4">MP4 (Standard)</option>
                 <option value="webm">WebM</option>
                 <option value="mp3">MP3 (Audio Only)</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                 Preferred Quality Target
               </label>
               <select
                 name="preferredQuality"
                 defaultValue={settings.preferredQuality || '720p'}
-                className="input-field bg-navy-900 border-white/15"
+                className="input-field text-xs"
               >
                 <option value="1080p">1080p Full HD</option>
                 <option value="720p">720p HD</option>
@@ -93,7 +96,7 @@ export default function Settings() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                 Max Concurrent Downloads
               </label>
               <input
@@ -102,12 +105,12 @@ export default function Settings() {
                 max="5"
                 name="maxConcurrentDownloads"
                 defaultValue={settings.maxConcurrentDownloads || 3}
-                className="input-field bg-navy-900 border-white/15"
+                className="input-field text-xs"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
+              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
                 File Retention Duration (Days)
               </label>
               <input
@@ -116,21 +119,21 @@ export default function Settings() {
                 max="365"
                 name="fileRetentionDays"
                 defaultValue={settings.fileRetentionDays || 30}
-                className="input-field bg-navy-900 border-white/15"
+                className="input-field text-xs"
               />
             </div>
           </div>
 
-          <div className="flex items-center gap-2 pt-2">
+          <div className="flex items-center gap-2 pt-1">
             <input
               type="checkbox"
               id="autoCleanup"
               name="autoCleanup"
               defaultChecked={settings.autoCleanup !== false}
-              className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 bg-navy-900 border-white/20"
+              className="w-3.5 h-3.5 rounded text-zinc-900 border-zinc-300 dark:border-zinc-700 focus:ring-0"
             />
-            <label htmlFor="autoCleanup" className="text-xs text-gray-300 font-medium">
-              Enable automatic cleanup of files older than retention policy
+            <label htmlFor="autoCleanup" className="text-xs text-zinc-600 dark:text-zinc-400">
+              Enable automatic purge of files exceeding retention window
             </label>
           </div>
 
@@ -138,25 +141,28 @@ export default function Settings() {
             <button
               type="submit"
               disabled={updateSettingsMutation.isPending}
-              className="btn-primary py-2.5 px-6 text-sm flex items-center gap-2"
+              className="btn-primary py-2 px-4 text-xs gap-1.5"
             >
-              <Check className="w-4 h-4" />
-              <span>{updateSettingsMutation.isPending ? 'Saving...' : 'Save Preferences'}</span>
+              <Check className="w-3.5 h-3.5" />
+              <span>{updateSettingsMutation.isPending ? 'Saving...' : 'Save Settings'}</span>
             </button>
           </div>
         </form>
       </div>
 
       {/* Security & Password */}
-      <div className="glass-card p-6 border-white/10 shadow-xl">
-        <h3 className="text-base font-semibold text-white flex items-center gap-2 mb-4">
-          <KeyRound className="w-5 h-5 text-purple-400" />
-          Update Security Credentials
+      <div className="minimal-card p-5 sm:p-6">
+        <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100 flex items-center gap-2 mb-1">
+          <KeyRound className="w-4 h-4 text-zinc-500" />
+          Update Admin Password
         </h3>
+        <p className="text-xs text-zinc-500 mb-4">
+          Ensure strong password standards (minimum 8 characters, 1 uppercase, 1 number).
+        </p>
 
-        <form onSubmit={handlePasswordChange} className="space-y-4 max-w-md">
+        <form onSubmit={handlePasswordChange} className="space-y-3 max-w-sm">
           <div>
-            <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
+            <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
               Current Password
             </label>
             <input
@@ -164,21 +170,21 @@ export default function Settings() {
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
               required
-              className="input-field bg-navy-900 border-white/15 text-sm"
+              className="input-field text-xs"
               placeholder="••••••••••••"
             />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-300 uppercase tracking-wider mb-1.5">
-              New Password (min 8 chars, 1 uppercase, 1 number)
+            <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1">
+              New Password
             </label>
             <input
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
               required
-              className="input-field bg-navy-900 border-white/15 text-sm"
+              className="input-field text-xs"
               placeholder="••••••••••••"
             />
           </div>
@@ -186,7 +192,7 @@ export default function Settings() {
           <button
             type="submit"
             disabled={passwordLoading || !newPassword || !currentPassword}
-            className="btn-secondary py-2.5 px-6 text-sm text-indigo-300 hover:text-white"
+            className="btn-secondary py-2 px-4 text-xs"
           >
             {passwordLoading ? 'Updating...' : 'Change Password'}
           </button>
