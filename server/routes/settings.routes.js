@@ -8,6 +8,7 @@ const { validate, settingsSchema } = require('../utils/validators');
 router.get('/branding', settingsController.getBranding);
 
 router.get('/', auth, settingsController.getSettings);
+router.put('/', auth, validate(settingsSchema), settingsController.updateSettings);
 router.patch('/', auth, validate(settingsSchema), settingsController.updateSettings);
 
 module.exports = router;

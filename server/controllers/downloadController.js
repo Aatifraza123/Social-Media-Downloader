@@ -8,7 +8,11 @@ exports.getAll = async (req, res) => {
   try {
     const { page = 1, limit = 20, platform, status, search } = req.query;
     const query = {};
-    if (req.user && req.user._id) query.userId = req.user._id;
+    
+    // In single-tenant private installation, admin can see all downloads (including guest/anonymous downloads)
+    if (req.user && req.user.role !== 'admin' && req.user._id) {
+      query.userId = req.user._id;
+    }
     if (platform && platform !== 'all') query.platform = platform;
     if (status && status !== 'all') query.status = status;
     if (search) query.title = { $regex: search, $options: 'i' };

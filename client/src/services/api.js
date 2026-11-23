@@ -7,6 +7,15 @@ const api = axios.create({
   timeout: 30000,
 });
 
+// Attach Authorization header from localStorage if available (dual Cookie + Bearer support)
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
@@ -34,8 +43,12 @@ export const downloadsAPI = {
   getOne: (id) => api.get(`/downloads/${id}`),
   getFileUrl: (id) => `/api/downloads/${id}/file`,
   getFile: async (id, filename) => {
+    const token = localStorage.getItem('token');
+    const headers = token ? { Authorization: `Bearer ${token}` } : {};
     const response = await axios.get(`/api/downloads/${id}/file`, {
       responseType: 'blob',
+      withCredentials: true,
+      headers,
     });
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
