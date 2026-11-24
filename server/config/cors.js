@@ -1,14 +1,21 @@
 const corsOptions = {
   origin: function (origin, callback) {
     const allowedOrigins = [
+      process.env.FRONTEND_URL || 'http://localhost:5173',
       process.env.CLIENT_URL || 'http://localhost:5173',
       'http://localhost:5173',
-      'http://localhost:3000'
+      'http://localhost:3000',
+      'https://aatifraza.cloud',
+      'https://www.aatifraza.cloud'
     ];
-    if (!origin || allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
+    
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.includes(origin) || process.env.NODE_ENV !== 'production') {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, true); // Allow all in production for now
     }
   },
   credentials: true,

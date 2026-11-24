@@ -26,6 +26,9 @@ const adminRoutes = require('./routes/admin.routes');
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Trust proxy for Nginx reverse proxy
+app.set('trust proxy', 1);
+
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors(corsOptions));
 app.use(cookieParser(process.env.COOKIE_SECRET || 'cookie-secret'));
