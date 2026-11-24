@@ -17,7 +17,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 APP_DIR="/var/www/Social-Media-Downloader"
-DOMAIN="yourdomain.com"  # CHANGE THIS!
+DOMAIN="aatifraza.cloud"
 
 echo -e "${YELLOW}📋 Configuration:${NC}"
 echo "   App Directory: $APP_DIR"
