@@ -12,12 +12,16 @@ const { apiLimiter } = require('./middleware/rateLimiter');
 const errorHandler = require('./middleware/errorHandler');
 const logger = require('./utils/logger');
 const downloadManager = require('./services/downloadManager');
+const cleanupJob = require('./jobs/cleanup.job');
 
 const authRoutes = require('./routes/auth.routes');
 const mediaRoutes = require('./routes/media.routes');
 const downloadRoutes = require('./routes/download.routes');
+const subtitleRoutes = require('./routes/subtitle.routes');
+const playlistRoutes = require('./routes/playlist.routes');
 const dashboardRoutes = require('./routes/dashboard.routes');
 const settingsRoutes = require('./routes/settings.routes');
+const adminRoutes = require('./routes/admin.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -40,8 +44,11 @@ app.use('/api/', apiLimiter);
 app.use('/api/auth', authRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/downloads', downloadRoutes);
+app.use('/api/subtitles', subtitleRoutes);
+app.use('/api/playlists', playlistRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/admin', adminRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({
@@ -71,6 +78,10 @@ const startServer = async () => {
   try {
     await connectDB();
     await downloadManager.init();
+    
+    // Start automatic cleanup job
+    cleanupJob.start();
+    
     const server = app.listen(PORT, () => {
       logger.info(`Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
     });

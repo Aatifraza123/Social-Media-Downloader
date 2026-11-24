@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react';
 import { Loader2, CheckCircle2, AlertTriangle, XCircle, Download, ExternalLink, Play, Sparkles } from 'lucide-react';
 import { downloadsAPI } from '../services/api';
 
-const STEPS = ['Pending', 'Validating', 'Processing', 'Downloading', 'Completed'];
+const SIMPLE_STEPS = ['Preparing', 'Processing', 'Downloading', 'Complete'];
 
 export default function DownloadProgress({ downloadId, onComplete }) {
-  const [data, setData] = useState({ status: 'pending', progress: 10 });
+  const [data, setData] = useState({ status: 'pending', progress: 10, fileSize: 0, downloadedBytes: 0 });
 
   useEffect(() => {
     if (!downloadId) return;
@@ -15,6 +15,7 @@ export default function DownloadProgress({ downloadId, onComplete }) {
     eventSource.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
+        console.log('Progress update:', payload); // Debug log
         setData(payload);
         if (payload.status === 'completed' || payload.status === 'failed') {
           eventSource.close();
@@ -38,67 +39,117 @@ export default function DownloadProgress({ downloadId, onComplete }) {
 
   const getStepIndex = (status) => {
     switch (status) {
-      case 'validating': return 1;
-      case 'processing': return 2;
-      case 'downloading': return 3;
-      case 'completed': return 4;
+      case 'pending':
+      case 'validating': return 0;
+      case 'processing': return 1;
+      case 'downloading': return 2;
+      case 'completed': return 3;
       default: return 0;
     }
   };
 
+  const getStatusText = (status) => {
+    switch (status) {
+      case 'pending': return 'Starting...';
+      case 'validating': return 'Preparing';
+      case 'processing': return 'Processing';
+      case 'downloading': return 'Downloading';
+      case 'completed': return 'Ready!';
+      case 'failed': return 'Failed';
+      default: return 'Processing';
+    }
+  };
+
   const currentStep = getStepIndex(data.status);
+  const formatBytes = (bytes) => {
+    if (!bytes) return '';
+    const mb = bytes / (1024 * 1024);
+    return `${mb.toFixed(1)} MB`;
+  };
 
   return (
-    <div className="saas-card p-6 sm:p-7 space-y-5 animate-slide-up">
+    <div className="clean-card p-6 space-y-5 animate-slide-up">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-3">
           {data.status === 'completed' ? (
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20">
-              <CheckCircle2 className="w-4 h-4" />
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-500 flex items-center justify-center border border-emerald-500/20">
+              <CheckCircle2 className="w-5 h-5" />
             </div>
           ) : data.status === 'failed' ? (
-            <div className="w-8 h-8 rounded-lg bg-red-500/10 text-red-500 flex items-center justify-center border border-red-500/20">
-              <AlertTriangle className="w-4 h-4" />
+            <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center border border-red-500/20">
+              <AlertTriangle className="w-5 h-5" />
             </div>
           ) : (
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/10 text-indigo-500 flex items-center justify-center border border-indigo-500/20">
-              <Loader2 className="w-4 h-4 animate-spin" />
+            <div className="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-500 flex items-center justify-center border border-blue-500/20">
+              <Loader2 className="w-5 h-5 animate-spin" />
             </div>
           )}
           <div>
-            <span className="text-sm font-bold text-zinc-900 dark:text-white capitalize">
-              {data.status === 'completed' ? 'Processing Complete' : `Pipeline Status: ${data.status}`}
+            <span className="text-base font-bold text-zinc-900 dark:text-white">
+              {getStatusText(data.status)}
             </span>
-            <div className="text-xs text-zinc-500">
-              Job ID: <span className="font-mono text-[11px]">{downloadId.slice(-8)}</span>
+            <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              {data.fileSize > 0 ? (
+                `File size: ${formatBytes(data.fileSize)}`
+              ) : data.status === 'completed' ? (
+                'Download complete!'
+              ) : (
+                'Processing your download...'
+              )}
             </div>
           </div>
         </div>
 
         <div className="text-right">
-          <span className="text-sm font-mono font-bold text-indigo-500">
-            {data.progress || 0}%
+          <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {Math.round(data.progress || 0)}%
           </span>
-          <div className="text-[10px] text-zinc-400 font-mono">Realtime SSE</div>
+          {data.downloadedBytes && data.fileSize && data.downloadedBytes > 0 && data.fileSize > 0 && (
+            <div className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
+              {formatBytes(data.downloadedBytes)} / {formatBytes(data.fileSize)}
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Pipeline Stage Indicators */}
-      <div className="grid grid-cols-4 gap-2 pt-1 text-[11px]">
-        {['Validating', 'Transcoding', 'Ingesting', 'Ready'].map((step, idx) => {
-          const isPassed = currentStep >= idx + 1;
+      {/* Progress Bar */}
+      <div className="space-y-2">
+        <div className="h-2 bg-zinc-200 dark:bg-zinc-800 rounded-full overflow-hidden">
+          <div 
+            className="h-full bg-gradient-to-r from-blue-600 to-blue-500 transition-all duration-300 ease-out"
+            style={{ width: `${data.progress || 0}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Simple Stage Indicators */}
+      <div className="grid grid-cols-4 gap-3 pt-2">
+        {SIMPLE_STEPS.map((step, idx) => {
+          const isPassed = currentStep > idx;
           const isCurrent = currentStep === idx;
           return (
-            <div key={idx} className="flex flex-col gap-1.5">
-              <div className={`h-1.5 rounded-full transition-all duration-300 ${
+            <div key={`step-${idx}`} className="flex flex-col items-center gap-2">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 font-bold ${
                 isPassed
-                  ? 'bg-emerald-500'
+                  ? 'bg-emerald-500 text-white'
                   : isCurrent
-                  ? 'bg-indigo-500 animate-pulse'
-                  : 'bg-zinc-200 dark:bg-white/[0.08]'
-              }`} />
-              <span className={`font-medium truncate ${
-                isPassed ? 'text-emerald-600 dark:text-emerald-400' : isCurrent ? 'text-indigo-500 font-bold' : 'text-zinc-400'
+                  ? 'bg-blue-500 text-white animate-pulse'
+                  : 'bg-zinc-200 dark:bg-zinc-800 text-zinc-400'
+              }`}>
+                {isPassed ? (
+                  <CheckCircle2 className="w-4 h-4" />
+                ) : isCurrent ? (
+                  <div className="w-2 h-2 rounded-full bg-white"></div>
+                ) : (
+                  <span className="text-xs">{idx + 1}</span>
+                )}
+              </div>
+              <span className={`text-xs font-medium text-center leading-tight ${
+                isPassed 
+                  ? 'text-emerald-600 dark:text-emerald-400' 
+                  : isCurrent 
+                  ? 'text-blue-600 dark:text-blue-400 font-bold' 
+                  : 'text-zinc-400'
               }`}>
                 {step}
               </span>
@@ -108,21 +159,24 @@ export default function DownloadProgress({ downloadId, onComplete }) {
       </div>
 
       {data.status === 'completed' && (
-        <div className="pt-2 flex flex-col sm:flex-row gap-3">
+        <div className="pt-4 flex flex-col sm:flex-row gap-3 border-t border-zinc-200/80 dark:border-white/[0.06]">
           <a
             href={downloadsAPI.getFileUrl(downloadId)}
-            className="btn-primary flex-1 py-3 gap-2 text-sm justify-center bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500"
+            className="flex-1 py-3.5 px-4 rounded-xl font-semibold text-sm bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-lg shadow-emerald-500/25 transition-all flex items-center justify-center gap-2"
           >
             <Download className="w-4 h-4" />
-            <span>Save Media File to Device</span>
+            <span>Download File</span>
           </a>
         </div>
       )}
 
       {data.error && (
-        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-500 flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-          <span>{data.error}</span>
+        <div className="p-4 rounded-xl bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-sm text-red-600 dark:text-red-400 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" />
+          <div>
+            <div className="font-semibold mb-1">Download Failed</div>
+            <div className="text-xs opacity-90">{data.error}</div>
+          </div>
         </div>
       )}
     </div>

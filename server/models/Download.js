@@ -9,7 +9,7 @@ const downloadSchema = new mongoose.Schema({
   },
   platform: {
     type: String,
-    enum: ['youtube', 'instagram', 'twitter'],
+    enum: ['youtube', 'instagram', 'twitter', 'tiktok'],
     required: true,
     index: true,
   },
@@ -71,6 +71,10 @@ const downloadSchema = new mongoose.Schema({
     default: 0,
     min: 0,
     max: 100,
+  },
+  retryCount: {
+    type: Number,
+    default: 0,
   },
   error: String,
   completedAt: Date,

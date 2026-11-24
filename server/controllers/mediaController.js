@@ -25,6 +25,10 @@ exports.analyze = async (req, res) => {
 exports.download = async (req, res) => {
   try {
     const { url, platform, format, quality } = req.body;
+    
+    // Log incoming request for debugging
+    logger.info('Download request received:', { url, platform, format, quality });
+    
     await validateUrl(url);
 
     const download = await downloadManager.startDownload(null, {
@@ -37,8 +41,8 @@ exports.download = async (req, res) => {
       progress: download.progress,
     }, 'Download initiated', 201);
   } catch (error) {
-    logger.error('Download start error:', error.message);
-    return ApiResponse.error(res, error.message, 400);
+    logger.error('Download start error:', error.message, error.stack);
+    return ApiResponse.error(res, error.message || 'Download failed', 400);
   }
 };
 

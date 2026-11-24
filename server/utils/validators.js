@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const logger = require('./logger');
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -24,7 +25,7 @@ const batchUrlSchema = z.object({
 
 const downloadSchema = z.object({
   url: z.string().url('Invalid URL'),
-  platform: z.enum(['youtube', 'instagram', 'twitter']).optional(),
+  platform: z.enum(['youtube', 'instagram', 'twitter', 'tiktok']).optional(),
   format: z.enum(['mp4', 'webm', 'mp3', 'm4a', 'jpg', 'png', 'webp']).optional(),
   quality: z.string().optional(),
 });
@@ -44,13 +45,18 @@ const validate = (schema) => (req, res, next) => {
     req.body = schema.parse(req.body);
     next();
   } catch (error) {
+    const errorDetails = error.errors?.map(e => ({
+      field: e.path.join('.'),
+      message: e.message,
+      received: e.received
+    }));
+    
+    logger.error('Validation error:', JSON.stringify(errorDetails));
+    
     return res.status(400).json({
       success: false,
       message: 'Validation failed',
-      errors: error.errors?.map(e => ({
-        field: e.path.join('.'),
-        message: e.message,
-      })),
+      errors: errorDetails,
     });
   }
 };

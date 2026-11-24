@@ -30,6 +30,17 @@ class PlatformDetector {
         /^https?:\/\/(www\.)?x\.com\/\w+\/status\/\d+/i,
       ],
     },
+    tiktok: {
+      name: 'TikTok',
+      icon: 'music',
+      color: '#000000',
+      patterns: [
+        /^https?:\/\/(www\.|vm\.|m\.)?tiktok\.com\/@[\w.-]+\/video\/\d+/i,
+        /^https?:\/\/(www\.|vm\.|m\.)?tiktok\.com\/v\/\d+/i,
+        /^https?:\/\/vm\.tiktok\.com\/[\w-]+/i,
+        /^https?:\/\/(www\.)?tiktok\.com\/t\/[\w-]+/i,
+      ],
+    },
   };
 
   static detect(url) {
@@ -81,6 +92,18 @@ class PlatformDetector {
       case 'twitter': {
         const match = url.match(/\/status\/(\d+)/);
         return match ? match[1] : null;
+      }
+      case 'tiktok': {
+        // Extract from video URL: /@username/video/1234567890
+        const videoMatch = url.match(/\/video\/(\d+)/);
+        if (videoMatch) return videoMatch[1];
+        // Extract from short URL: /v/1234567890
+        const shortMatch = url.match(/\/v\/(\d+)/);
+        if (shortMatch) return shortMatch[1];
+        // For vm.tiktok.com or /t/ short links, return the slug
+        const slugMatch = url.match(/\/(?:vm\.tiktok\.com|t)\/([\w-]+)/);
+        if (slugMatch) return slugMatch[1];
+        return null;
       }
       default:
         return null;

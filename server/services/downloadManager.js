@@ -30,6 +30,7 @@ class DownloadManager {
       case 'youtube': return YouTubeService;
       case 'instagram': return InstagramService;
       case 'twitter': return TwitterService;
+      case 'tiktok': return require('./platforms/tiktok.service');
       default: throw new Error(`Unsupported platform: ${platform}`);
     }
   }
@@ -37,7 +38,7 @@ class DownloadManager {
   async analyze(url) {
     const detected = PlatformDetector.detect(url);
     if (!detected) {
-      throw new Error('Unsupported platform. Supported: YouTube, Instagram, X (Twitter)');
+      throw new Error('Unsupported platform. Supported: YouTube, Instagram, X (Twitter), TikTok');
     }
     const service = this.getService(detected.platform);
     const metadata = await service.analyze(url);
@@ -56,12 +57,21 @@ class DownloadManager {
       logger.warn(`Metadata pre-fetch failed: ${err.message}`);
     }
 
+    // Determine mediaType based on format
+    let mediaType = 'video';
+    if (['mp3', 'm4a'].includes(format)) {
+      mediaType = 'audio';
+    } else if (['jpg', 'png', 'webp'].includes(format)) {
+      mediaType = 'image';
+    }
+
     const download = await Download.create({
       userId: userId || null,
-      url,
+      originalUrl: url,  // Changed from 'url' to 'originalUrl'
       platform,
       format,
       quality,
+      mediaType,  // Added required field
       status: 'pending',
       title: metadata.title || `${platform} media`,
       thumbnail: metadata.thumbnail || null,

@@ -10,6 +10,7 @@ const ALLOWED_DOMAINS = [
   'instagram.com', 'www.instagram.com',
   'twitter.com', 'www.twitter.com',
   'x.com', 'www.x.com',
+  'tiktok.com', 'www.tiktok.com', 'm.tiktok.com', 'vm.tiktok.com',
   'i.ytimg.com', 'yt3.ggpht.com',
   'pbs.twimg.com', 'video.twimg.com',
   'scontent.cdninstagram.com',
@@ -43,7 +44,7 @@ async function validateUrl(urlString) {
   );
 
   if (!isAllowed) {
-    throw new Error('Domain not supported. Allowed: YouTube, Instagram, X (Twitter)');
+    throw new Error('Domain not supported. Allowed: YouTube, Instagram, X (Twitter), TikTok');
   }
 
   try {
