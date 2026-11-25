@@ -10,6 +10,7 @@ export default function Downloader() {
   const [metadata, setMetadata] = useState(null);
   const [activeDownloadId, setActiveDownloadId] = useState(null);
   const [activeFormatKey, setActiveFormatKey] = useState(null);
+  const [resetCount, setResetCount] = useState(0);
 
   const analyzeMutation = useAnalyzeUrl();
   const downloadMutation = useStartDownload();
@@ -45,11 +46,25 @@ export default function Downloader() {
     }
   };
 
+  // Called when the file download finishes: resets the entire UI back to clean initial state
+  const handleDownloadComplete = () => {
+    setTimeout(() => {
+      setActiveDownloadId(null);
+      setMetadata(null);
+      setActiveFormatKey(null);
+      setResetCount((prev) => prev + 1); // Triggers URL input clear
+    }, 1200);
+  };
+
   return (
     <div className="space-y-6 max-w-4xl mx-auto py-2">
       {/* Search Input Bar (Centered & prominent) */}
       <div className="max-w-2xl mx-auto">
-        <UrlInput onAnalyze={handleAnalyze} isLoading={analyzeMutation.isPending} />
+        <UrlInput
+          onAnalyze={handleAnalyze}
+          isLoading={analyzeMutation.isPending}
+          resetSignal={resetCount}
+        />
       </div>
 
       {/* Progress State */}
@@ -57,9 +72,7 @@ export default function Downloader() {
         <div className="max-w-2xl mx-auto">
           <DownloadProgress
             downloadId={activeDownloadId}
-            onComplete={() => {
-              setActiveDownloadId(null);
-            }}
+            onComplete={handleDownloadComplete}
           />
         </div>
       )}
@@ -83,7 +96,7 @@ export default function Downloader() {
         </div>
       )}
 
-      {/* Premium SaaS Landing Features & Showcase Content */}
+      {/* Premium SaaS Landing Features & Architecture Content */}
       <PremiumContent />
     </div>
   );

@@ -3,9 +3,17 @@ import { Search, Loader2, ArrowRight, Clipboard, Youtube, Instagram, Twitter, Ch
 import { detectPlatform } from '../utils/platformDetector';
 import toast from 'react-hot-toast';
 
-export default function UrlInput({ onAnalyze, isLoading }) {
+export default function UrlInput({ onAnalyze, isLoading, resetSignal }) {
   const [url, setUrl] = useState('');
   const [detected, setDetected] = useState(null);
+
+  // When parent triggers resetSignal, clear input and detected state
+  useEffect(() => {
+    if (resetSignal) {
+      setUrl('');
+      setDetected(null);
+    }
+  }, [resetSignal]);
 
   useEffect(() => {
     if (url.trim()) {
@@ -46,7 +54,7 @@ export default function UrlInput({ onAnalyze, isLoading }) {
 
   return (
     <div className="w-full space-y-6 pt-4 sm:pt-6 pb-2">
-      {/* Editorial Headline — Sharp, understated, high-end */}
+      {/* Editorial Headline */}
       <div className="text-center space-y-2 max-w-xl mx-auto">
         <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-mono text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-white/[0.05] border border-gray-200/80 dark:border-white/[0.08]">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
@@ -61,7 +69,7 @@ export default function UrlInput({ onAnalyze, isLoading }) {
       </div>
 
       {/* Main Command-Line Style Input Box */}
-      <div className="clean-card-elevated p-2 sm:p-2.5 max-w-2xl mx-auto transition-all focus-within:border-brand-500/50">
+      <div className="clean-card p-2 sm:p-2.5 max-w-2xl mx-auto transition-all focus-within:border-brand-500/50">
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <div className="relative flex-1 flex items-center">
             <div className="absolute left-3.5 flex items-center pointer-events-none text-gray-400">
