@@ -49,9 +49,8 @@ class YouTubeService {
       if (info.duration) metadata.duration = `${Math.floor(info.duration / 60)}:${String(info.duration % 60).padStart(2, '0')}`;
       if (info.thumbnail) metadata.thumbnail = info.thumbnail;
 
-      // Extract file sizes from formats
+      // Extract available resolutions and file sizes from formats
       if (info.formats && Array.isArray(info.formats)) {
-        const formatSizeMap = new Map();
         const resolutionLabels = {
           4320: '8K UHD',
           2880: '5K',
@@ -64,52 +63,59 @@ class YouTubeService {
           240: 'Very Low',
           144: 'Minimal'
         };
-        
+
+        // Collect all unique heights from video-only streams (filesize is optional — DASH often lacks it)
+        const heightSizeMap = new Map();
         info.formats.forEach(fmt => {
-          if (fmt.height && fmt.filesize && fmt.vcodec !== 'none') {
-            const height = fmt.height;
-            const key = `${height}p`;
-            if (!formatSizeMap.has(key) || formatSizeMap.get(key) < fmt.filesize) {
-              formatSizeMap.set(key, fmt.filesize);
+          if (fmt.height && fmt.vcodec && fmt.vcodec !== 'none') {
+            const h = fmt.height;
+            const size = fmt.filesize || fmt.filesize_approx || 0;
+            if (!heightSizeMap.has(h) || size > heightSizeMap.get(h)) {
+              heightSizeMap.set(h, size);
             }
           }
         });
 
-        const sortedResolutions = Array.from(formatSizeMap.keys())
-          .map(key => parseInt(key))
-          .sort((a, b) => b - a);
+        const sortedHeights = Array.from(heightSizeMap.keys()).sort((a, b) => b - a);
 
-        const videoFormats = sortedResolutions.map(height => {
+        const videoFormats = sortedHeights.map(height => {
           const key = `${height}p`;
           const label = resolutionLabels[height] || `${height}p`;
+          const size = heightSizeMap.get(height);
           return {
             formatId: key,
             quality: key,
             format: 'mp4',
             label: `${key} ${label}`,
             mediaType: 'video',
-            fileSize: formatSizeMap.get(key)
+            fileSize: size || undefined
           };
         });
 
-        const audioFormats = info.formats.filter(fmt => 
-          fmt.acodec !== 'none' && fmt.vcodec === 'none' && fmt.filesize
+        // Audio: accept filesize OR filesize_approx
+        const audioFormats = info.formats.filter(fmt =>
+          fmt.acodec && fmt.acodec !== 'none' && (!fmt.vcodec || fmt.vcodec === 'none')
         );
-        
+
         let audioSize = 0;
         if (audioFormats.length > 0) {
-          const bestAudio = audioFormats.reduce((best, curr) => 
-            curr.filesize > best.filesize ? curr : best
-          );
-          audioSize = bestAudio.filesize;
+          const bestAudio = audioFormats.reduce((best, curr) => {
+            const cs = curr.filesize || curr.filesize_approx || 0;
+            const bs = best.filesize || best.filesize_approx || 0;
+            return cs > bs ? curr : best;
+          });
+          audioSize = bestAudio.filesize || bestAudio.filesize_approx || 0;
         }
 
         const audioFormatsList = [
-          { formatId: 'audio-mp3', quality: 'audio', format: 'mp3', label: 'High Quality MP3', mediaType: 'audio', fileSize: audioSize },
-          { formatId: 'audio-m4a', quality: 'audio', format: 'm4a', label: 'Audio M4A', mediaType: 'audio', fileSize: audioSize },
+          { formatId: 'audio-mp3', quality: 'audio', format: 'mp3', label: 'High Quality MP3', mediaType: 'audio', fileSize: audioSize || undefined },
+          { formatId: 'audio-m4a', quality: 'audio', format: 'm4a', label: 'Audio M4A', mediaType: 'audio', fileSize: audioSize || undefined },
         ];
 
-        metadata.availableFormats = [...videoFormats, ...audioFormatsList];
+        // Only replace defaults when we actually found real resolutions
+        if (videoFormats.length > 0) {
+          metadata.availableFormats = [...videoFormats, ...audioFormatsList];
+        }
       }
     } catch {
       // Graceful fallback to verified formats when yt-dlp binary is absent or times out

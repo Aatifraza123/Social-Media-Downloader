@@ -142,6 +142,50 @@ class InstagramService {
         const d = info.duration;
         metadata.duration = `${Math.floor(d / 60)}:${String(Math.floor(d % 60)).padStart(2, '0')}`;
       }
+
+      // Extract real available qualities from yt-dlp formats
+      if (info.formats && Array.isArray(info.formats)) {
+        const heightSizeMap = new Map();
+        info.formats.forEach(fmt => {
+          if (fmt.height && fmt.vcodec && fmt.vcodec !== 'none') {
+            const h = fmt.height;
+            const size = fmt.filesize || fmt.filesize_approx || 0;
+            if (!heightSizeMap.has(h) || size > heightSizeMap.get(h)) {
+              heightSizeMap.set(h, size);
+            }
+          }
+        });
+
+        const sortedHeights = Array.from(heightSizeMap.keys()).sort((a, b) => b - a);
+        if (sortedHeights.length > 0) {
+          const resLabels = { 2160: '4K UHD', 1440: '2K QHD', 1080: 'Full HD', 720: 'HD', 480: 'SD', 360: 'Low' };
+          const videoFormats = sortedHeights.map(height => {
+            const key = `${height}p`;
+            const label = resLabels[height] || `${height}p`;
+            return {
+              formatId: key,
+              quality: key,
+              format: 'mp4',
+              label: `${key} ${label}`,
+              mediaType: 'video',
+              fileSize: heightSizeMap.get(height) || undefined
+            };
+          });
+
+          // Audio track
+          const audioFmts = info.formats.filter(f => f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none'));
+          let audioSize = 0;
+          if (audioFmts.length > 0) {
+            const best = audioFmts.reduce((b, c) => (c.filesize || c.filesize_approx || 0) > (b.filesize || b.filesize_approx || 0) ? c : b);
+            audioSize = best.filesize || best.filesize_approx || 0;
+          }
+
+          metadata.availableFormats = [
+            ...videoFormats,
+            { formatId: 'audio-mp3', quality: 'audio', format: 'mp3', label: 'Audio Track MP3', mediaType: 'audio', fileSize: audioSize || undefined },
+          ];
+        }
+      }
     } catch (err) {
       ytdlpFailed = true;
       const errMsg = err.stderr || err.message || '';
@@ -336,9 +380,19 @@ class InstagramService {
     // Video download — use yt-dlp
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
     const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
-    const formatArg = format === 'mp3' || quality === 'audio'
-      ? '-x --audio-format mp3'
-      : `-f "best"`;
+
+    let formatArg;
+    if (format === 'mp3' || quality === 'audio') {
+      formatArg = '-x --audio-format mp3 --audio-quality 0';
+    } else {
+      const heightMatch = quality.match(/(\d+)p?/);
+      const height = heightMatch ? parseInt(heightMatch[1]) : null;
+      if (height) {
+        formatArg = `-f "bestvideo[height<=${height}]+bestaudio/best[height<=${height}]" --merge-output-format mp4`;
+      } else {
+        formatArg = `-f "best"`;
+      }
+    }
 
     const command = `"${ytdlpPath}" --ffmpeg-location "${ffmpegPath}" ${cookiesArg()} ${formatArg} -o "${outputPath}" --no-playlist "${cleanUrl}"`;
     logger.info(`Instagram video download: ${command}`);

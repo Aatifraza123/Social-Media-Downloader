@@ -133,10 +133,19 @@ class DownloadManager {
 
     const resolvedPath = download.filePath || (download.fileName ? path.join(this.storagePath, download.fileName) : null);
 
+    // Build a user-friendly filename from the original title
+    const safeTitle = (download.title || 'media')
+      .replace(/[/\\?%*:|"<>]/g, '')  // Remove OS-restricted characters
+      .replace(/\s+/g, ' ')            // Collapse whitespace
+      .trim()
+      .substring(0, 150) || 'media';
+    const ext = download.format === 'mp3' ? 'mp3' : download.format === 'jpg' ? 'jpg' : 'mp4';
+    const userFileName = `${safeTitle}.${ext}`;
+
     return {
       filePath: resolvedPath,
-      fileName: download.fileName || `${download.title}.${download.format}`,
-      mimeType: download.format === 'mp3' ? 'audio/mpeg' : 'video/mp4',
+      fileName: userFileName,
+      mimeType: download.format === 'mp3' ? 'audio/mpeg' : download.format === 'jpg' ? 'image/jpeg' : 'video/mp4',
       cloudinaryUrl: download.cloudinaryUrl,
     };
   }

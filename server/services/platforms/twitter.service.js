@@ -52,44 +52,49 @@ class TwitterService {
       if (info.uploader) metadata.creator = info.uploader;
       if (info.thumbnail) metadata.thumbnail = info.thumbnail;
       
-      // Extract file sizes from formats
+      // Extract real available qualities from yt-dlp formats
       if (info.formats && Array.isArray(info.formats)) {
-        const formatSizeMap = {};
-        
-        // Find best video format
-        const videoFormats = info.formats.filter(fmt => fmt.vcodec !== 'none' && fmt.filesize);
-        if (videoFormats.length > 0) {
-          const bestVideo = videoFormats.reduce((best, curr) => 
-            (curr.filesize || 0) > (best.filesize || 0) ? curr : best
-          );
-          formatSizeMap['best'] = bestVideo.filesize;
-          
-          // Find 720p if available
-          const video720p = videoFormats.find(fmt => fmt.height === 720);
-          if (video720p && video720p.filesize) {
-            formatSizeMap['720p'] = video720p.filesize;
+        const heightSizeMap = new Map();
+        info.formats.forEach(fmt => {
+          if (fmt.height && fmt.vcodec && fmt.vcodec !== 'none') {
+            const h = fmt.height;
+            const size = fmt.filesize || fmt.filesize_approx || 0;
+            if (!heightSizeMap.has(h) || size > heightSizeMap.get(h)) {
+              heightSizeMap.set(h, size);
+            }
           }
-        }
-        
-        // Find audio formats
-        const audioFormats = info.formats.filter(fmt => 
-          fmt.acodec !== 'none' && fmt.vcodec === 'none' && fmt.filesize
-        );
-        if (audioFormats.length > 0) {
-          const bestAudio = audioFormats.reduce((best, curr) => 
-            (curr.filesize || 0) > (best.filesize || 0) ? curr : best
-          );
-          formatSizeMap['audio'] = bestAudio.filesize;
-        }
-        
-        // Update availableFormats with file sizes
-        metadata.availableFormats = metadata.availableFormats.map(fmt => {
-          const sizeKey = fmt.quality === 'audio' ? 'audio' : fmt.quality;
-          if (formatSizeMap[sizeKey]) {
-            return { ...fmt, fileSize: formatSizeMap[sizeKey] };
-          }
-          return fmt;
         });
+
+        const sortedHeights = Array.from(heightSizeMap.keys()).sort((a, b) => b - a);
+
+        if (sortedHeights.length > 0) {
+          const resLabels = { 2160: '4K UHD', 1440: '2K QHD', 1080: 'Full HD', 720: 'HD', 480: 'SD', 360: 'Low' };
+          const videoFormats = sortedHeights.map(height => {
+            const key = `${height}p`;
+            const label = resLabels[height] || `${height}p`;
+            return {
+              formatId: key,
+              quality: key,
+              format: 'mp4',
+              label: `${key} ${label}`,
+              mediaType: 'video',
+              fileSize: heightSizeMap.get(height) || undefined
+            };
+          });
+
+          // Audio
+          const audioFmts = info.formats.filter(f => f.acodec && f.acodec !== 'none' && (!f.vcodec || f.vcodec === 'none'));
+          let audioSize = 0;
+          if (audioFmts.length > 0) {
+            const best = audioFmts.reduce((b, c) => (c.filesize || c.filesize_approx || 0) > (b.filesize || b.filesize_approx || 0) ? c : b);
+            audioSize = best.filesize || best.filesize_approx || 0;
+          }
+
+          metadata.availableFormats = [
+            ...videoFormats,
+            { formatId: 'audio-mp3', quality: 'audio', format: 'mp3', label: 'Audio MP3', mediaType: 'audio', fileSize: audioSize || undefined },
+          ];
+        }
       }
     } catch {
       // Graceful fallback to default metadata
@@ -103,9 +108,18 @@ class TwitterService {
     const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
     const normalized = url.replace('x.com', 'twitter.com');
 
-    let formatArg = format === 'mp3' || quality === 'audio'
-      ? '-x --audio-format mp3'
-      : `-f "best" --merge-output-format ${format}`;
+    let formatArg;
+    if (format === 'mp3' || quality === 'audio') {
+      formatArg = '-x --audio-format mp3 --audio-quality 0';
+    } else {
+      const heightMatch = quality.match(/(\d+)p?/);
+      const height = heightMatch ? parseInt(heightMatch[1]) : null;
+      if (height) {
+        formatArg = `-f "bestvideo[height<=${height}]+bestaudio/best[height<=${height}]" --merge-output-format ${format}`;
+      } else {
+        formatArg = `-f "best" --merge-output-format ${format}`;
+      }
+    }
 
     const command = `"${ytdlpPath}" --ffmpeg-location "${ffmpegPath}" ${cookiesArg()} ${jsRuntimeArg()} ${formatArg} -o "${outputPath}" --no-playlist "${normalized}"`;
     logger.info(`Twitter download: ${command}`);

@@ -60,7 +60,7 @@ exports.getFile = async (req, res) => {
     }
 
     res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"; filename*=UTF-8''${encodeURIComponent(fileName)}`);
     const stat = fs.statSync(filePath);
     res.setHeader('Content-Length', stat.size);
     const stream = fs.createReadStream(filePath);
