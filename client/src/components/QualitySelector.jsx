@@ -1,7 +1,7 @@
 import React from 'react';
 import { Download, Loader2 } from 'lucide-react';
 
-export default function QualitySelector({ formats = [], onDownload, isDownloading }) {
+export default function QualitySelector({ formats = [], onDownload, isDownloading, activeFormatKey }) {
   if (!formats || formats.length === 0) return null;
 
   return (
@@ -15,6 +15,8 @@ export default function QualitySelector({ formats = [], onDownload, isDownloadin
           const isAudio = fmt.mediaType === 'audio' || fmt.format === 'mp3';
           const label = fmt.label || fmt.quality || (isAudio ? 'MP3 Audio' : 'Video');
           const ext = fmt.format ? fmt.format.toUpperCase() : (isAudio ? 'MP3' : 'MP4');
+          const key = fmt.formatId || `${fmt.quality}-${fmt.format}`;
+          const isThisButtonSpinning = isDownloading && activeFormatKey === key;
 
           return (
             <div
@@ -36,12 +38,17 @@ export default function QualitySelector({ formats = [], onDownload, isDownloadin
                 onClick={() => onDownload(fmt)}
                 className="btn-primary py-1.5 px-3.5 text-xs font-semibold gap-1.5"
               >
-                {isDownloading ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                {isThisButtonSpinning ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Processing</span>
+                  </>
                 ) : (
-                  <Download className="w-3.5 h-3.5" />
+                  <>
+                    <Download className="w-3.5 h-3.5" />
+                    <span>Download</span>
+                  </>
                 )}
-                <span>Download</span>
               </button>
             </div>
           );

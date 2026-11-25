@@ -8,12 +8,14 @@ import { useAnalyzeUrl, useStartDownload } from '../hooks/useDownloads';
 export default function Downloader() {
   const [metadata, setMetadata] = useState(null);
   const [activeDownloadId, setActiveDownloadId] = useState(null);
+  const [activeFormatKey, setActiveFormatKey] = useState(null);
 
   const analyzeMutation = useAnalyzeUrl();
   const downloadMutation = useStartDownload();
 
   const handleAnalyze = async (url) => {
     setActiveDownloadId(null);
+    setActiveFormatKey(null);
     const result = await analyzeMutation.mutateAsync(url);
     if (result?.success) {
       setMetadata(result.data);
@@ -23,15 +25,22 @@ export default function Downloader() {
   const handleDownload = async (formatOption) => {
     if (!metadata) return;
 
-    const result = await downloadMutation.mutateAsync({
-      url: metadata.originalUrl,
-      platform: metadata.platform,
-      format: formatOption.format,
-      quality: formatOption.quality,
-    });
+    const key = formatOption.formatId || `${formatOption.quality}-${formatOption.format}`;
+    setActiveFormatKey(key);
 
-    if (result?.success && result.data?.downloadId) {
-      setActiveDownloadId(result.data.downloadId);
+    try {
+      const result = await downloadMutation.mutateAsync({
+        url: metadata.originalUrl,
+        platform: metadata.platform,
+        format: formatOption.format,
+        quality: formatOption.quality,
+      });
+
+      if (result?.success && result.data?.downloadId) {
+        setActiveDownloadId(result.data.downloadId);
+      }
+    } finally {
+      setActiveFormatKey(null);
     }
   };
 
@@ -40,11 +49,13 @@ export default function Downloader() {
       {/* Search Input Bar */}
       <UrlInput onAnalyze={handleAnalyze} isLoading={analyzeMutation.isPending} />
 
-      {/* Progress / Success State */}
+      {/* Progress State */}
       {activeDownloadId && (
         <DownloadProgress
           downloadId={activeDownloadId}
-          onComplete={() => {}}
+          onComplete={() => {
+            setActiveDownloadId(null);
+          }}
         />
       )}
 
@@ -59,6 +70,7 @@ export default function Downloader() {
           formats={metadata.availableFormats}
           onDownload={handleDownload}
           isDownloading={downloadMutation.isPending}
+          activeFormatKey={activeFormatKey}
         />
       )}
     </div>
