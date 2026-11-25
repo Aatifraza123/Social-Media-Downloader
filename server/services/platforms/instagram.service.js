@@ -298,8 +298,8 @@ class InstagramService {
               { 
                 formatId: 'image-jpg', 
                 quality: 'image', 
-                format: 'jpg', 
-                label: `Download Images (${imageCount})`, 
+                format: imageCount > 1 ? 'zip' : 'jpg', 
+                label: imageCount > 1 ? `Download Images as ZIP (${imageCount} images)` : 'Download Image (JPG)', 
                 mediaType: 'image',
                 fileSize: totalImageSize || 0
               }
@@ -363,18 +363,97 @@ class InstagramService {
       const item = apiData.items?.[0];
       if (!item) throw new Error('Could not fetch Instagram media info for image download');
 
-      let imageUrl;
+      const path = require('path');
+      const archiver = require('archiver');
+      
       if (item.media_type === 1) {
-        imageUrl = item.image_versions2?.candidates?.[0]?.url;
+        // Single image
+        const imageUrl = item.image_versions2?.candidates?.[0]?.url;
+        if (!imageUrl) throw new Error('No image URL found in this Instagram post');
+        logger.info(`Instagram single image download from API: ${mediaId}`);
+        await downloadImageFromUrl(imageUrl, outputPath);
+        return { stdout: 'Image download complete' };
+        
       } else if (item.media_type === 8) {
-        // Carousel — download first image (or zip in future)
-        imageUrl = item.carousel_media?.[0]?.image_versions2?.candidates?.[0]?.url;
+        // Carousel with multiple images/videos
+        const carouselItems = item.carousel_media || [];
+        const imageItems = carouselItems.filter(m => m.media_type === 1);
+        
+        if (imageItems.length === 0) {
+          throw new Error('No images found in this carousel post');
+        }
+        
+        if (imageItems.length === 1) {
+          // Single image in carousel
+          const imageUrl = imageItems[0].image_versions2?.candidates?.[0]?.url;
+          if (!imageUrl) throw new Error('No image URL found');
+          logger.info(`Instagram carousel single image download: ${mediaId}`);
+          await downloadImageFromUrl(imageUrl, outputPath);
+          return { stdout: 'Image download complete' };
+        }
+        
+        // Multiple images - create ZIP
+        logger.info(`Instagram carousel multi-image download (${imageItems.length} images): ${mediaId}`);
+        
+        // Download all images to temp location
+        const tempDir = path.join(path.dirname(outputPath), `temp_${Date.now()}`);
+        fs.mkdirSync(tempDir, { recursive: true });
+        
+        try {
+          const downloadPromises = imageItems.map(async (imgItem, index) => {
+            const imageUrl = imgItem.image_versions2?.candidates?.[0]?.url;
+            if (!imageUrl) return null;
+            const tempImagePath = path.join(tempDir, `image_${index + 1}.jpg`);
+            await downloadImageFromUrl(imageUrl, tempImagePath);
+            return tempImagePath;
+          });
+          
+          const downloadedPaths = (await Promise.all(downloadPromises)).filter(Boolean);
+          
+          if (downloadedPaths.length === 0) {
+            throw new Error('Failed to download any images from carousel');
+          }
+          
+          // Create ZIP file
+          return new Promise((resolve, reject) => {
+            const output = fs.createWriteStream(outputPath);
+            const archive = archiver('zip', { zlib: { level: 9 } });
+            
+            output.on('close', () => {
+              // Cleanup temp files
+              downloadedPaths.forEach(p => fs.unlinkSync(p));
+              fs.rmdirSync(tempDir);
+              resolve({ stdout: `Downloaded ${downloadedPaths.length} images as ZIP` });
+            });
+            
+            archive.on('error', (err) => {
+              // Cleanup on error
+              downloadedPaths.forEach(p => {
+                try { fs.unlinkSync(p); } catch {}
+              });
+              try { fs.rmdirSync(tempDir); } catch {}
+              reject(err);
+            });
+            
+            archive.pipe(output);
+            downloadedPaths.forEach((imgPath, index) => {
+              archive.file(imgPath, { name: `image_${index + 1}.jpg` });
+            });
+            archive.finalize();
+          });
+          
+        } catch (err) {
+          // Cleanup temp directory on error
+          try {
+            const files = fs.readdirSync(tempDir);
+            files.forEach(file => fs.unlinkSync(path.join(tempDir, file)));
+            fs.rmdirSync(tempDir);
+          } catch {}
+          throw err;
+        }
       }
-      if (!imageUrl) throw new Error('No image URL found in this Instagram post');
-
-      logger.info(`Instagram image download from API: ${mediaId}`);
-      await downloadImageFromUrl(imageUrl, outputPath);
-      return { stdout: 'Image download complete' };
+      
+      throw new Error('No image URL found in this Instagram post');
     }
 
     // Video download — use yt-dlp

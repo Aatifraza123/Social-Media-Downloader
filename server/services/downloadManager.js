@@ -83,9 +83,19 @@ class DownloadManager {
       await download.save();
       this.notifyListeners(downloadId, { status: 'downloading', progress: 10 });
 
-      const service = this.getService(platform);
+    const service = this.getService(platform);
       const fileId = uuidv4();
-      const outputExt = format === 'mp3' ? 'mp3' : 'mp4';
+      
+      // Determine output extension based on format and media type
+      let outputExt = 'mp4';
+      if (format === 'mp3') {
+        outputExt = 'mp3';
+      } else if (format === 'jpg' || format === 'jpeg' || quality === 'image') {
+        outputExt = 'jpg';
+      } else if (format === 'zip') {
+        outputExt = 'zip';
+      }
+      
       const outputFileName = `${fileId}.${outputExt}`;
       const outputPath = path.join(this.storagePath, outputFileName);
 
@@ -139,13 +149,28 @@ class DownloadManager {
       .replace(/\s+/g, ' ')            // Collapse whitespace
       .trim()
       .substring(0, 150) || 'media';
-    const ext = download.format === 'mp3' ? 'mp3' : download.format === 'jpg' ? 'jpg' : 'mp4';
+    
+    // Determine file extension and MIME type
+    let ext = 'mp4';
+    let mimeType = 'video/mp4';
+    
+    if (download.format === 'mp3') {
+      ext = 'mp3';
+      mimeType = 'audio/mpeg';
+    } else if (download.format === 'jpg' || download.format === 'jpeg') {
+      ext = 'jpg';
+      mimeType = 'image/jpeg';
+    } else if (download.format === 'zip') {
+      ext = 'zip';
+      mimeType = 'application/zip';
+    }
+    
     const userFileName = `${safeTitle}.${ext}`;
 
     return {
       filePath: resolvedPath,
       fileName: userFileName,
-      mimeType: download.format === 'mp3' ? 'audio/mpeg' : download.format === 'jpg' ? 'image/jpeg' : 'video/mp4',
+      mimeType: mimeType,
       cloudinaryUrl: download.cloudinaryUrl,
     };
   }
