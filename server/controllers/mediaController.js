@@ -30,7 +30,7 @@ exports.analyze = async (req, res) => {
     return ApiResponse.success(res, metadata, 'Media metadata retrieved');
   } catch (error) {
     logger.error('Analyze error:', error.message);
-    return ApiResponse.error(res, error.message, 400);
+    return ApiResponse.error(res, error.message, error.statusCode === 429 ? 429 : 400);
   }
 };
 
@@ -54,7 +54,7 @@ exports.download = async (req, res) => {
     }, 'Download initiated', 201);
   } catch (error) {
     logger.error('Download start error:', error.message, error.stack);
-    return ApiResponse.error(res, error.message || 'Download failed', 400);
+    return ApiResponse.error(res, error.message || 'Download failed', error.statusCode === 429 ? 429 : 400);
   }
 };
 
