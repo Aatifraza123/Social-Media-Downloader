@@ -65,27 +65,47 @@ function injectButtons() {
 }
 
 function injectSinglePostButton() {
-  // Find the action bar (like, comment, share buttons)
-  const actionBars = document.querySelectorAll('section[class*="x"]');
+  // Multiple selectors to find action bar (Instagram keeps changing structure)
+  const selectors = [
+    'section > div > span', // New structure
+    'section[class*="x"] > div', // Alternative
+    'article section span', // Fallback
+  ];
   
-  for (const actionBar of actionBars) {
-    // Skip if already has download button
-    if (actionBar.querySelector('.smd-download-btn')) continue;
-    
-    // Check if this is an action bar with buttons
-    const buttons = actionBar.querySelectorAll('button, a');
-    if (buttons.length < 2) continue;
-    
-    const downloadBtn = createDownloadButton();
-    
-    // Insert after the first few buttons
-    const targetButton = buttons[1] || buttons[0];
-    if (targetButton && targetButton.parentElement) {
-      targetButton.parentElement.style.display = 'flex';
-      targetButton.parentElement.style.gap = '8px';
-      targetButton.parentElement.appendChild(downloadBtn);
+  let actionContainer = null;
+  
+  for (const selector of selectors) {
+    const elements = document.querySelectorAll(selector);
+    for (const el of elements) {
+      // Check if this element contains action buttons (like, comment, share)
+      const svgs = el.querySelectorAll('svg');
+      if (svgs.length >= 2) {
+        actionContainer = el;
+        break;
+      }
     }
+    if (actionContainer) break;
   }
+  
+  if (!actionContainer) {
+    console.log('SMD: Action container not found');
+    return;
+  }
+  
+  // Skip if already has download button
+  if (actionContainer.querySelector('.smd-download-btn')) return;
+  
+  const downloadBtn = createDownloadButton();
+  
+  // Create wrapper to match Instagram's button style
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'display: inline-flex; align-items: center;';
+  wrapper.appendChild(downloadBtn);
+  
+  // Append at the end
+  actionContainer.appendChild(wrapper);
+  
+  console.log('SMD: Download button injected on single post');
 }
 
 function injectFeedButtons() {
@@ -96,49 +116,91 @@ function injectFeedButtons() {
     // Skip if already has download button
     if (post.querySelector('.smd-download-btn')) return;
     
-    // Find action bar in this post
-    const actionBar = post.querySelector('section');
-    if (!actionBar) return;
-    
-    const buttons = actionBar.querySelectorAll('button, a');
-    if (buttons.length < 2) return;
-    
     // Get post URL from the post
     const postLink = post.querySelector('a[href*="/p/"], a[href*="/reel/"], a[href*="/tv/"]');
     if (!postLink) return;
     
     const postUrl = postLink.href;
     
+    // Find action bar using multiple strategies
+    const actionBar = post.querySelector('section');
+    if (!actionBar) return;
+    
+    // Find the container with action buttons
+    let actionContainer = null;
+    const spans = actionBar.querySelectorAll('span');
+    
+    for (const span of spans) {
+      const svgs = span.querySelectorAll('svg');
+      if (svgs.length >= 2) {
+        actionContainer = span;
+        break;
+      }
+    }
+    
+    if (!actionContainer) {
+      // Fallback: try to find div with buttons
+      const divs = actionBar.querySelectorAll('div');
+      for (const div of divs) {
+        const svgs = div.querySelectorAll('svg');
+        if (svgs.length >= 2) {
+          actionContainer = div;
+          break;
+        }
+      }
+    }
+    
+    if (!actionContainer) return;
+    
     const downloadBtn = createDownloadButton(postUrl);
     
-    // Insert after share button
-    const targetButton = buttons[2] || buttons[1] || buttons[0];
-    if (targetButton && targetButton.parentElement) {
-      targetButton.parentElement.style.display = 'flex';
-      targetButton.parentElement.style.gap = '8px';
-      targetButton.parentElement.appendChild(downloadBtn);
-    }
+    // Create wrapper to match Instagram's button style
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'display: inline-flex; align-items: center;';
+    wrapper.appendChild(downloadBtn);
+    
+    // Append at the end
+    actionContainer.appendChild(wrapper);
   });
+  
+  console.log('SMD: Processed ' + posts.length + ' posts in feed');
 }
 
 function createDownloadButton(postUrl = null) {
-  const btn = document.createElement('button');
+  const btn = document.createElement('div');
   btn.className = 'smd-download-btn';
+  btn.style.cssText = `
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 8px;
+  `;
   btn.innerHTML = `
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-      <polyline points="7 10 12 15 17 10"></polyline>
-      <line x1="12" y1="15" x2="12" y2="3"></line>
+    <svg aria-label="Download" width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2a1 1 0 0 1 1 1v10.59l3.3-3.3a1 1 0 1 1 1.4 1.42l-5 5a1 1 0 0 1-1.4 0l-5-5a1 1 0 1 1 1.4-1.42l3.3 3.3V3a1 1 0 0 1 1-1zM3 17a1 1 0 0 1 1 1v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2a1 1 0 1 1 2 0v2a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3v-2a1 1 0 0 1 1-1z"/>
     </svg>
   `;
   btn.title = 'Download with Social Media Downloader';
+  btn.setAttribute('role', 'button');
+  btn.setAttribute('tabindex', '0');
   
   btn.addEventListener('click', async (e) => {
     e.preventDefault();
     e.stopPropagation();
     
     const url = postUrl || window.location.href;
+    console.log('SMD: Download button clicked for:', url);
     showDownloadModal(url, btn);
+  });
+  
+  // Hover effect
+  btn.addEventListener('mouseenter', () => {
+    btn.style.opacity = '0.6';
+  });
+  
+  btn.addEventListener('mouseleave', () => {
+    btn.style.opacity = '1';
   });
   
   return btn;
