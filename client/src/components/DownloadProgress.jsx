@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Loader2, CheckCircle2, AlertTriangle, Download } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { downloadsAPI } from '../services/api';
+import toast from 'react-hot-toast';
 
 export default function DownloadProgress({ downloadId, onComplete }) {
   const [status, setStatus] = useState('downloading');
@@ -19,13 +20,15 @@ export default function DownloadProgress({ downloadId, onComplete }) {
       setStatus('completed');
       setProgress(100);
 
+      toast.success('Download started');
+
       setTimeout(async () => {
         try {
           await downloadsAPI.getFile(downloadId, 'media');
         } catch (err) {
           console.error(err);
         }
-      }, 200);
+      }, 100);
 
       if (onComplete) onComplete();
     };
@@ -92,20 +95,17 @@ export default function DownloadProgress({ downloadId, onComplete }) {
     };
   }, [downloadId, onComplete]);
 
-  const handleManualDownload = async () => {
-    try {
-      await downloadsAPI.getFile(downloadId, 'media');
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  // If completed, do not render any "Download Ready / Save to Device" prompt
+  if (status === 'completed') {
+    return null;
+  }
 
   return (
-    <div className="clean-card p-5 text-center space-y-3">
-      {status !== 'completed' && status !== 'failed' && (
-        <div className="space-y-3 py-2">
-          <div className="flex items-center justify-center gap-2 text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-            <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+    <div className="clean-card p-4 text-center space-y-2.5">
+      {status !== 'failed' ? (
+        <div className="space-y-2 py-1">
+          <div className="flex items-center justify-center gap-2 text-xs font-medium text-zinc-700 dark:text-zinc-300">
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-500" />
             <span>Downloading... ({progress}%)</span>
           </div>
 
@@ -116,32 +116,13 @@ export default function DownloadProgress({ downloadId, onComplete }) {
             />
           </div>
         </div>
-      )}
-
-      {status === 'completed' && (
-        <div className="space-y-3 py-2">
-          <div className="flex items-center justify-center gap-2 text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-            <CheckCircle2 className="w-4 h-4" />
-            <span>Download Ready!</span>
-          </div>
-
-          <button
-            onClick={handleManualDownload}
-            className="btn-primary py-2 px-4 text-xs gap-1.5"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Save to Device</span>
-          </button>
-        </div>
-      )}
-
-      {status === 'failed' && (
-        <div className="space-y-2 py-2">
-          <div className="flex items-center justify-center gap-2 text-sm font-semibold text-rose-500">
-            <AlertTriangle className="w-4 h-4" />
+      ) : (
+        <div className="space-y-1 py-1">
+          <div className="flex items-center justify-center gap-2 text-xs font-semibold text-rose-500">
+            <AlertTriangle className="w-3.5 h-3.5" />
             <span>{errorMessage || 'Failed to download'}</span>
           </div>
-          <p className="text-xs text-zinc-400">Please verify the link and try again</p>
+          <p className="text-[11px] text-zinc-400">Please verify the link and try again</p>
         </div>
       )}
     </div>
