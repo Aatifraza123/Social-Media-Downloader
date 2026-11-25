@@ -55,7 +55,7 @@ class DownloadManager {
     try {
       metadata = await service.analyze(url);
     } catch (err) {
-      if (platform === 'youtube') throw err;
+      if (platform === 'youtube' || platform === 'twitter') throw err;
       if (err.code === 'X_EXTERNAL_VIDEO_UNAVAILABLE') throw err;
       logger.warn(`Metadata pre-fetch failed: ${err.message}`);
     }
@@ -68,12 +68,20 @@ class DownloadManager {
       formatId = selected.formatId;
       quality = selected.quality;
     }
+    let photo;
+    if (platform === 'twitter' && metadata.type === 'image') {
+      photo = formatId ? metadata.availableFormats.find(f => f.formatId === formatId) : metadata.availableFormats[0];
+      if (!photo) throw new Error('Selected X photo is unavailable.');
+      format = photo.format;
+      quality = photo.quality;
+    }
     const download = await Download.create({
       userId: userId || null,
       originalUrl: url,
       platform,
       format,
       quality,
+      mediaType: photo ? 'image' : undefined,
       status: 'pending',
       title: metadata.title || `${platform} media`,
       thumbnail: metadata.thumbnail || null,
@@ -81,11 +89,11 @@ class DownloadManager {
       creator: metadata.creator || null,
     });
 
-    this.processDownload(download._id, { url, platform, format, quality, formatId });
+    this.processDownload(download._id, { url, platform, format, quality, formatId, photoSource: photo?.source });
     return download;
   }
 
-  async processDownload(downloadId, { url, platform, format, quality, formatId }) {
+  async processDownload(downloadId, { url, platform, format, quality, formatId, photoSource }) {
     const download = await Download.findById(downloadId);
     if (!download) return;
 
@@ -99,7 +107,7 @@ class DownloadManager {
       const fileId = uuidv4();
       
       // Determine output extension based on format and media type
-      let outputExt = platform === 'youtube' ? format : 'mp4';
+      let outputExt = (platform === 'youtube' || photoSource) ? format : 'mp4';
       if (format === 'mp3') {
         outputExt = 'mp3';
       } else if (format === 'jpg' || format === 'jpeg' || quality === 'image') {
@@ -111,7 +119,7 @@ class DownloadManager {
       const outputFileName = `${fileId}.${outputExt}`;
       const outputPath = path.join(this.storagePath, outputFileName);
 
-      await service.download(url, format, quality, outputPath, formatId);
+      await service.download(url, format, quality, outputPath, formatId, photoSource);
       const output = await fs.stat(outputPath);
       if (!output.isFile() || output.size === 0) {
         throw new Error('Downloader produced no media file');
@@ -152,7 +160,10 @@ class DownloadManager {
     let ext = 'mp4';
     let mimeType = 'video/mp4';
     
-    if (download.platform === 'youtube' && download.fileName?.endsWith('.webm')) {
+    if (download.mediaType === 'image' && ['png', 'webp'].includes(download.format)) {
+      ext = download.format;
+      mimeType = 'image/' + ext;
+    } else if (download.platform === 'youtube' && download.fileName?.endsWith('.webm')) {
       ext = 'webm';
       mimeType = 'video/webm';
     } else if (download.platform === 'youtube' && download.fileName?.endsWith('.m4a')) {

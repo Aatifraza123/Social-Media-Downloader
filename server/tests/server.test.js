@@ -79,10 +79,14 @@ describe('Social Media Downloader Pro - Comprehensive Test Suite', () => {
       expect(metadata.availableFormats.length).toBeGreaterThan(0);
     });
 
-    test('TwitterService returns structured metadata', async () => {
-      const metadata = await TwitterService.analyze('https://x.com/jack/status/20');
-      expect(metadata.platform).toBe('twitter');
-      expect(metadata.availableFormats.length).toBeGreaterThan(0);
+    test('X photos expose original image formats and ignore unrelated URLs', () => {
+      const formats = TwitterService.photoFormats({ photos: [
+        { url: 'https://pbs.twimg.com/media/sample.jpg', width: 1199, height: 1312 },
+        { url: 'https://example.com/media/sample.jpg' },
+      ] });
+      expect(formats).toHaveLength(1);
+      expect(formats[0]).toMatchObject({ format: 'jpg', mediaType: 'image',
+        source: 'https://pbs.twimg.com/media/sample?format=jpg&name=orig' });
     });
   });
 

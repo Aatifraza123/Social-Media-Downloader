@@ -46,11 +46,7 @@ class TwitterService {
       creator: '',
       duration: null,
       thumbnail: null,
-      availableFormats: [
-        { formatId: 'best-mp4', quality: 'best', format: 'mp4', label: 'Best Quality MP4', mediaType: 'video' },
-        { formatId: '720p', quality: '720p', format: 'mp4', label: '720p MP4', mediaType: 'video' },
-        { formatId: 'audio-mp3', quality: 'audio', format: 'mp3', label: 'Audio MP3', mediaType: 'audio' },
-      ],
+      availableFormats: [],
       notice: 'Only posts with publicly accessible media attachments can be downloaded.',
     };
 
@@ -113,13 +109,44 @@ class TwitterService {
     } catch (err) {
       const unavailable = externalVideoError(err.stderr);
       if (unavailable) throw unavailable;
-      // Graceful fallback to default metadata
+      // Photo posts are available through the public X embed endpoint.
     }
 
-    return metadata;
+    if (metadata.availableFormats.length) return metadata;
+
+    const response = await fetch('https://cdn.syndication.twimg.com/tweet-result?id=' + tweetId + '&token=1', {
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) throw new Error('Could not load attachments from this X post.');
+    const post = await response.json();
+    const photos = this.photoFormats(post);
+    if (!photos.length) throw new Error('No downloadable photos or videos were found in this X post.');
+    return { ...metadata, type: 'image', title: post.text || metadata.title, creator: post.user?.name,
+      thumbnail: photos[0].source, availableFormats: photos };
   }
 
-  static async download(url, format = 'mp4', quality = 'best', outputPath) {
+  static photoFormats(post) {
+    return (post.photos || []).flatMap((photo, index) => {
+      const match = /^https:\/\/pbs\.twimg\.com\/media\/([\w-]+)\.(jpg|png|webp)(?:\?.*)?$/i.exec(photo.url);
+      if (!match) return [];
+      const format = match[2].toLowerCase();
+      const size = photo.width && photo.height ? ' · ' + photo.width + '×' + photo.height : '';
+      return [{ formatId: 'photo-' + match[1], format, quality: 'original', mediaType: 'image',
+        label: 'Photo ' + (index + 1) + size,
+        source: 'https://pbs.twimg.com/media/' + match[1] + '?format=' + format + '&name=orig' }];
+    });
+  }
+
+  static async download(url, format = 'mp4', quality = 'best', outputPath, formatId, source) {
+    if (source) {
+      const response = await fetch(source, { redirect: 'error', signal: AbortSignal.timeout(30000) });
+      const mime = 'image/' + (format === 'jpg' ? 'jpeg' : format);
+      if (!response.ok || response.headers.get('content-type')?.split(';')[0] !== mime) {
+        throw new Error('Could not retrieve the original X photo.');
+      }
+      await require('fs').promises.writeFile(outputPath, Buffer.from(await response.arrayBuffer()));
+      return;
+    }
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
     const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
     const normalized = url.replace('x.com', 'twitter.com');
