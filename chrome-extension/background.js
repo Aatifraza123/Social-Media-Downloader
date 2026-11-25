@@ -56,19 +56,32 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // API Functions
 async function analyzeMedia(url) {
-  const response = await fetch(`${API_BASE_URL}/media/analyze`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ url })
-  });
+  console.log('SMD: Analyzing URL:', url);
   
-  if (!response.ok) {
-    throw new Error('Failed to analyze media');
+  try {
+    const response = await fetch(`${API_BASE_URL}/media/analyze`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url })
+    });
+    
+    console.log('SMD: API Response Status:', response.status);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('SMD: API Error Response:', errorText);
+      throw new Error(`API returned ${response.status}: ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log('SMD: Analysis Success:', data);
+    return data;
+  } catch (error) {
+    console.error('SMD: Analysis Failed:', error);
+    throw error;
   }
-  
-  return await response.json();
 }
 
 async function downloadMedia(url, format, quality) {

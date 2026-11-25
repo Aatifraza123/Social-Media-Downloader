@@ -207,8 +207,11 @@ function createDownloadButton(postUrl = null) {
 }
 
 async function showDownloadModal(url, buttonElement) {
+  console.log('SMD: showDownloadModal called for:', url);
+  
   // Show loading state
   buttonElement.disabled = true;
+  const originalHTML = buttonElement.innerHTML;
   buttonElement.innerHTML = `
     <svg class="smd-spinner" width="24" height="24" viewBox="0 0 24 24">
       <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none" opacity="0.25"></circle>
@@ -217,28 +220,34 @@ async function showDownloadModal(url, buttonElement) {
   `;
   
   try {
+    console.log('SMD: Sending message to background script...');
+    
     // Analyze media
     const response = await chrome.runtime.sendMessage({
       action: 'analyzeMedia',
       url: url
     });
     
+    console.log('SMD: Response from background:', response);
+    
     if (!response.success) {
-      throw new Error(response.error);
+      throw new Error(response.error || 'Unknown error');
     }
     
     const metadata = response.data;
     
     // Create modal
-    createDownloadOptionsModal(url, metadata, buttonElement);
+    createDownloadOptionsModal(url, metadata, buttonElement, originalHTML);
     
   } catch (error) {
-    alert('Failed to analyze media: ' + error.message);
-    resetButton(buttonElement);
+    console.error('SMD: Error in showDownloadModal:', error);
+    alert('Failed to analyze media: ' + error.message + '\n\nCheck console for details (F12)');
+    buttonElement.disabled = false;
+    buttonElement.innerHTML = originalHTML;
   }
 }
 
-function createDownloadOptionsModal(url, metadata, buttonElement) {
+function createDownloadOptionsModal(url, metadata, buttonElement, originalHTML) {
   // Remove existing modal
   const existingModal = document.querySelector('.smd-modal');
   if (existingModal) existingModal.remove();
@@ -278,13 +287,15 @@ function createDownloadOptionsModal(url, metadata, buttonElement) {
   // Event listeners
   modal.querySelector('.smd-close').addEventListener('click', () => {
     modal.remove();
-    resetButton(buttonElement);
+    buttonElement.disabled = false;
+    buttonElement.innerHTML = originalHTML;
   });
   
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {
       modal.remove();
-      resetButton(buttonElement);
+      buttonElement.disabled = false;
+      buttonElement.innerHTML = originalHTML;
     }
   });
   
