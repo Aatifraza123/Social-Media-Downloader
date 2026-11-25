@@ -6,7 +6,19 @@ const logger = require('../utils/logger');
 
 exports.analyze = async (req, res) => {
   try {
+    console.log('=== Analyze Request Debug ===');
+    console.log('Body:', req.body);
+    console.log('Content-Type:', req.headers['content-type']);
+    console.log('Origin:', req.headers['origin']);
+    console.log('===========================');
+    
     const { url } = req.body;
+    
+    if (!url) {
+      logger.error('No URL provided in request body');
+      return ApiResponse.error(res, 'URL is required', 400);
+    }
+    
     await validateUrl(url);
 
     const detected = PlatformDetector.detect(url);

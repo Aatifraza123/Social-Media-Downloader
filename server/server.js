@@ -32,7 +32,21 @@ app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors(corsOptions));
 app.use(cookieParser(process.env.COOKIE_SECRET || 'cookie-secret'));
-app.use(express.json({ limit: '10mb' }));
+
+// Better JSON parsing with error handling
+app.use((req, res, next) => {
+  express.json({ limit: '10mb' })(req, res, (err) => {
+    if (err) {
+      logger.error('JSON parse error:', err.message);
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid JSON in request body'
+      });
+    }
+    next();
+  });
+});
+
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 if (process.env.NODE_ENV !== 'test') {
