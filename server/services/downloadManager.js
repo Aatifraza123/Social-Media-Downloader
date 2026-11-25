@@ -30,7 +30,6 @@ class DownloadManager {
       case 'youtube': return YouTubeService;
       case 'instagram': return InstagramService;
       case 'twitter': return TwitterService;
-      case 'tiktok': return require('./platforms/tiktok.service');
       default: throw new Error(`Unsupported platform: ${platform}`);
     }
   }
@@ -38,7 +37,7 @@ class DownloadManager {
   async analyze(url) {
     const detected = PlatformDetector.detect(url);
     if (!detected) {
-      throw new Error('Unsupported platform. Supported: YouTube, Instagram, X (Twitter), TikTok');
+      throw new Error('Unsupported platform. Supported: YouTube, Instagram, X (Twitter)');
     }
     const service = this.getService(detected.platform);
     const metadata = await service.analyze(url);
@@ -57,21 +56,12 @@ class DownloadManager {
       logger.warn(`Metadata pre-fetch failed: ${err.message}`);
     }
 
-    // Determine mediaType based on format
-    let mediaType = 'video';
-    if (['mp3', 'm4a'].includes(format)) {
-      mediaType = 'audio';
-    } else if (['jpg', 'png', 'webp'].includes(format)) {
-      mediaType = 'image';
-    }
-
     const download = await Download.create({
       userId: userId || null,
-      originalUrl: url,  // Changed from 'url' to 'originalUrl'
+      originalUrl: url,
       platform,
       format,
       quality,
-      mediaType,  // Added required field
       status: 'pending',
       title: metadata.title || `${platform} media`,
       thumbnail: metadata.thumbnail || null,
@@ -116,7 +106,7 @@ class DownloadManager {
         try {
           const stats = await fs.stat(outputPath);
           fileSize = stats.size;
-        } catch {}
+        } catch { }
 
         download.status = 'completed';
         download.progress = 100;
@@ -130,7 +120,7 @@ class DownloadManager {
     } catch (error) {
       logger.error(`Download process error: ${error.message}`);
       download.status = 'failed';
-      download.errorMessage = error.message;
+      download.error = error.message;
       await download.save();
       this.notifyListeners(downloadId, { status: 'failed', error: error.message });
     }
@@ -141,8 +131,10 @@ class DownloadManager {
     if (!download) throw new Error('Download not found');
     if (download.status !== 'completed') throw new Error('File not ready');
 
+    const resolvedPath = download.filePath || (download.fileName ? path.join(this.storagePath, download.fileName) : null);
+
     return {
-      filePath: download.filePath,
+      filePath: resolvedPath,
       fileName: download.fileName || `${download.title}.${download.format}`,
       mimeType: download.format === 'mp3' ? 'audio/mpeg' : 'video/mp4',
       cloudinaryUrl: download.cloudinaryUrl,
@@ -175,7 +167,7 @@ class DownloadManager {
     const set = this.listeners.get(id);
     if (set) {
       for (const res of set) {
-        try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch {}
+        try { res.write(`data: ${JSON.stringify(data)}\n\n`); } catch { }
       }
     }
   }
@@ -201,7 +193,7 @@ class DownloadManager {
         { $group: { _id: null, total: { $sum: '$fileSize' } } },
       ]);
       storageUsed = res[0]?.total || 0;
-    } catch {}
+    } catch { }
 
     return {
       total,
@@ -236,7 +228,7 @@ class DownloadManager {
           { $group: { _id: '$status', count: { $sum: 1 } } },
         ]),
       ]);
-    } catch {}
+    } catch { }
 
     return {
       downloadsOverTime: downloadsOverTime.map(d => ({ date: d._id, count: d.count })),

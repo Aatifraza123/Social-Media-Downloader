@@ -37,6 +37,7 @@ const downloadSchema = new mongoose.Schema({
     default: '720p',
   },
   fileName: String,
+  filePath: String,
   fileSize: {
     type: Number,
     default: 0,

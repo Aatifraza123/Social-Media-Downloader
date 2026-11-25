@@ -42,22 +42,43 @@ export const downloadsAPI = {
   getAll: (params) => api.get('/downloads', { params }),
   getOne: (id) => api.get(`/downloads/${id}`),
   getFileUrl: (id) => `/api/downloads/${id}/file`,
-  getFile: async (id, filename) => {
-    const token = localStorage.getItem('token');
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-    const response = await axios.get(`/api/downloads/${id}/file`, {
-      responseType: 'blob',
-      withCredentials: true,
-      headers,
-    });
-    const url = window.URL.createObjectURL(new Blob([response.data]));
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', filename || 'downloaded-media.mp4');
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    window.URL.revokeObjectURL(url);
+  getFile: async (id, fallbackFilename) => {
+    try {
+      const token = localStorage.getItem('token');
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      
+      const response = await axios.get(`/api/downloads/${id}/file`, {
+        responseType: 'blob',
+        withCredentials: true,
+        headers,
+      });
+      
+      // Extract filename from Content-Disposition header if available
+      let filename = fallbackFilename || 'downloaded-media.mp4';
+      const contentDisposition = response.headers['content-disposition'];
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+          filename = decodeURIComponent(filename);
+        }
+      }
+      
+      // Create download link
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', filename);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      return true;
+    } catch (error) {
+      console.error('Download failed:', error);
+      throw error;
+    }
   },
   cancel: (id) => api.post(`/downloads/${id}/cancel`),
   retry: (id) => api.post(`/downloads/${id}/retry`),

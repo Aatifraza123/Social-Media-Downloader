@@ -8,7 +8,8 @@ exports.getAll = async (req, res) => {
   try {
     const { page = 1, limit = 20, platform, status, search } = req.query;
     const query = {};
-    
+    if (req.user && req.user._id) query.userId = req.user._id;
+
     // In single-tenant private installation, admin can see all downloads (including guest/anonymous downloads)
     if (req.user && req.user.role !== 'admin' && req.user._id) {
       query.userId = req.user._id;
@@ -79,8 +80,8 @@ exports.getProgress = async (req, res) => {
   const downloadId = req.params.id;
   const download = await Download.findById(downloadId);
   if (download) {
-    res.write(`data: ${JSON.stringify({ 
-      status: download.status, 
+    res.write(`data: ${JSON.stringify({
+      status: download.status,
       progress: download.progress,
       fileSize: download.fileSize || 0,
       downloadedBytes: download.downloadedBytes || 0
