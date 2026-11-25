@@ -1,7 +1,8 @@
+// Update manifest to add more permissions
 {
   "manifest_version": 3,
   "name": "Social Media Downloader Pro",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Download videos and images from Instagram, YouTube, and Twitter with one click",
   "permissions": [
     "contextMenus",
@@ -16,7 +17,9 @@
     "https://youtu.be/*",
     "https://twitter.com/*",
     "https://x.com/*",
-    "https://aatifraza.cloud/*"
+    "https://aatifraza.cloud/*",
+    "https://*/*",
+    "http://*/*"
   ],
   "background": {
     "service_worker": "background.js"
