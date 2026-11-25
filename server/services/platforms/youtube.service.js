@@ -127,7 +127,12 @@ class YouTubeService {
   static async download(url, format = 'mp4', quality = 'best', outputPath) {
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
     const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
+    const denoPath = process.env.DENO_PATH;
+    const cookiesFile = process.env.YOUTUBE_COOKIES_FILE || process.env.COOKIES_FILE;
+    
     const ffmpegArg = `--ffmpeg-location "${ffmpegPath}"`;
+    const denoArg = denoPath ? `--js-runtimes "deno:${denoPath}"` : '';
+    const cookiesArg = cookiesFile ? `--cookies "${cookiesFile}"` : '';
 
     let formatArg = '';
     if (quality === 'audio' || format === 'mp3' || format === 'm4a') {
@@ -143,7 +148,7 @@ class YouTubeService {
       }
     }
 
-    const command = `"${ytdlpPath}" ${ffmpegArg} ${formatArg} -o "${outputPath}" --no-playlist "${url}"`;
+    const command = `"${ytdlpPath}" ${ffmpegArg} ${denoArg} ${cookiesArg} ${formatArg} -o "${outputPath}" --no-playlist "${url}"`;
     logger.info(`Executing download: ${command}`);
 
     try {
