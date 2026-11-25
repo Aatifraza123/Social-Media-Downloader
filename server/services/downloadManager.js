@@ -55,7 +55,7 @@ class DownloadManager {
     try {
       metadata = await service.analyze(url);
     } catch (err) {
-      if (platform === 'youtube' || platform === 'twitter') throw err;
+      if (platform === 'youtube' || platform === 'twitter' || platform === 'instagram') throw err;
       if (err.code === 'X_EXTERNAL_VIDEO_UNAVAILABLE') throw err;
       logger.warn(`Metadata pre-fetch failed: ${err.message}`);
     }
@@ -89,11 +89,11 @@ class DownloadManager {
       creator: metadata.creator || null,
     });
 
-    this.processDownload(download._id, { url, platform, format, quality, formatId, photoSource: photo?.source });
+    this.processDownload(download._id, { url, platform, format, quality, formatId, photoSource: photo?.source, videoSource: metadata.videoSource });
     return download;
   }
 
-  async processDownload(downloadId, { url, platform, format, quality, formatId, photoSource }) {
+  async processDownload(downloadId, { url, platform, format, quality, formatId, photoSource, videoSource }) {
     const download = await Download.findById(downloadId);
     if (!download) return;
 
@@ -119,7 +119,7 @@ class DownloadManager {
       const outputFileName = `${fileId}.${outputExt}`;
       const outputPath = path.join(this.storagePath, outputFileName);
 
-      await service.download(url, format, quality, outputPath, formatId, photoSource);
+      await service.download(url, format, quality, outputPath, formatId, photoSource || videoSource);
       const output = await fs.stat(outputPath);
       if (!output.isFile() || output.size === 0) {
         throw new Error('Downloader produced no media file');

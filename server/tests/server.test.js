@@ -73,10 +73,9 @@ describe('Social Media Downloader Pro - Comprehensive Test Suite', () => {
       expect(YouTubeService.formats([])).toEqual([]);
     });
 
-    test('InstagramService returns structured metadata', async () => {
-      const metadata = await InstagramService.analyze('https://www.instagram.com/reel/C2xyzABC123/');
-      expect(metadata.platform).toBe('instagram');
-      expect(metadata.availableFormats.length).toBeGreaterThan(0);
+    test('An inaccessible Instagram reel does not offer invented download options', async () => {
+      await expect(InstagramService.analyze('https://www.instagram.com/reel/C2xyzABC123/'))
+        .rejects.toThrow('Instagram did not provide accessible media');
     });
 
     test('X photos expose original image formats and ignore unrelated URLs', () => {

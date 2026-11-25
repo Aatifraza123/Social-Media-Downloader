@@ -1,16 +1,16 @@
 const logger = require('../../utils/logger');
 const PlatformDetector = require('./platformDetector');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const { promisify } = require('util');
 const https = require('https');
 const fs = require('fs');
-const execAsync = promisify(exec);
+const execAsync = promisify(execFile);
 
 function cookiesArg() {
-  if (process.env.INSTAGRAM_COOKIES_FILE) return `--cookies "${process.env.INSTAGRAM_COOKIES_FILE}"`;
-  if (process.env.COOKIES_FILE) return `--cookies "${process.env.COOKIES_FILE}"`;
-  if (process.env.COOKIES_BROWSER) return `--cookies-from-browser ${process.env.COOKIES_BROWSER}`;
-  return '';
+  if (process.env.INSTAGRAM_COOKIES_FILE) return ['--cookies', process.env.INSTAGRAM_COOKIES_FILE];
+  if (process.env.COOKIES_FILE) return ['--cookies', process.env.COOKIES_FILE];
+  if (process.env.COOKIES_BROWSER) return ['--cookies-from-browser', process.env.COOKIES_BROWSER];
+  return [];
 }
 
 function detectType(url) {
@@ -117,10 +117,7 @@ class InstagramService {
       creator: '',
       duration: null,
       thumbnail: null,
-      availableFormats: [
-        { formatId: 'best-mp4', quality: 'best', format: 'mp4', label: 'Original Quality MP4', mediaType: 'video' },
-        { formatId: 'audio-mp3', quality: 'audio', format: 'mp3', label: 'Audio Track MP3', mediaType: 'audio' },
-      ],
+      availableFormats: [],
       notice: 'Private Instagram profiles cannot be accessed. Only authorized public content supported.',
       isImagePost: false,
     };
@@ -128,10 +125,10 @@ class InstagramService {
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
 
     // First try yt-dlp (works for reels, videos, some posts)
-    let ytdlpFailed = false;
+
     try {
       const { stdout } = await execAsync(
-        `"${ytdlpPath}" ${cookiesArg()} --dump-json --no-download "${cleanUrl}"`,
+        ytdlpPath, [...cookiesArg(), '--dump-json', '--no-download', '--', cleanUrl],
         { timeout: 15000 }
       );
       const info = JSON.parse(stdout);
@@ -187,7 +184,7 @@ class InstagramService {
         }
       }
     } catch (err) {
-      ytdlpFailed = true;
+
       const errMsg = err.stderr || err.message || '';
       if (errMsg.includes('No video formats found')) {
         metadata.isImagePost = true;
@@ -240,7 +237,7 @@ class InstagramService {
             },
           ];
         } else if (mediaType === 8) {
-          // Carousel — mix of images and videos
+          // Carousel â€” mix of images and videos
           const carouselItems = item.carousel_media || [];
           const hasVideos = carouselItems.some(m => m.media_type === 2);
           const imageUrls = carouselItems
@@ -317,6 +314,11 @@ class InstagramService {
           
           // Get video file size
           const videoUrl = item.video_versions?.[0]?.url;
+          if (!videoUrl || !/^https:\/\/([a-z0-9-]+\.)+(cdninstagram\.com|fbcdn\.net)\//i.test(videoUrl)) {
+            if (metadata.availableFormats.length) return metadata;
+            throw new Error('No usable Instagram video source');
+          }
+          Object.defineProperty(metadata, 'videoSource', { value: videoUrl });
           let videoSize = 0;
           if (videoUrl) {
             try {
@@ -349,13 +351,16 @@ class InstagramService {
       // If yt-dlp also failed and we have no image info, keep isImagePost state from yt-dlp error
     }
 
+    if (!metadata.availableFormats.length) {
+      throw new Error('Instagram did not provide accessible media for this link. Please try again later.');
+    }
     return metadata;
   }
 
-  static async download(url, format = 'mp4', quality = 'best', outputPath) {
+  static async download(url, format = 'mp4', quality = 'best', outputPath, formatId, videoSource) {
     const cleanUrl = url.split('?')[0];
 
-    // Image download — use Instagram API directly
+    // Image download â€” use Instagram API directly
     if (format === 'jpg' || quality === 'image') {
       const contentId = PlatformDetector.extractVideoId(url, 'instagram');
       const mediaId = shortcodeToMediaId(contentId);
@@ -456,34 +461,27 @@ class InstagramService {
       throw new Error('No image URL found in this Instagram post');
     }
 
-    // Video download — use yt-dlp
+    // Video download â€” use yt-dlp
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
     const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
 
-    let formatArg;
+    const args = ['--ffmpeg-location', ffmpegPath, '--no-playlist', '--no-progress'];
     if (format === 'mp3' || quality === 'audio') {
-      formatArg = '-x --audio-format mp3 --audio-quality 0';
-    } else {
-      const heightMatch = quality.match(/(\d+)p?/);
-      const height = heightMatch ? parseInt(heightMatch[1]) : null;
-      if (height) {
-        formatArg = `-f "bestvideo[height<=${height}]+bestaudio/best[height<=${height}]" --merge-output-format mp4`;
-      } else {
-        formatArg = `-f "best"`;
-      }
+      args.push('-x', '--audio-format', 'mp3', '--audio-quality', '0');
+    } else if (/^\d+p$/.test(quality) && !videoSource) {
+      const height = parseInt(quality, 10);
+      args.push('-f', `bestvideo[height<=${height}]+bestaudio/best[height<=${height}]`, '--merge-output-format', 'mp4');
     }
-
-    const command = `"${ytdlpPath}" --ffmpeg-location "${ffmpegPath}" ${cookiesArg()} ${formatArg} -o "${outputPath}" --no-playlist "${cleanUrl}"`;
-    logger.info(`Instagram video download: ${command}`);
-
+    if (videoSource) args.push('--referer', 'https://www.instagram.com/');
+    else args.push(...cookiesArg());
     try {
-      return await execAsync(command, { timeout: 300000 });
+      return await execAsync(ytdlpPath, [...args, '-o', outputPath, '--', videoSource || cleanUrl], { timeout: 300000 });
     } catch (err) {
       const errMsg = err.stderr || err.message || '';
       if (errMsg.includes('No video formats found')) {
         throw new Error('This Instagram post contains only images. Use image format to download.');
       }
-      throw new Error(`Instagram download failed: ${errMsg}`);
+      throw new Error('Instagram could not provide the requested media. Please refresh the preview and try again later.');
     }
   }
 }
