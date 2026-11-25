@@ -36,7 +36,11 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'analyzeMedia') {
     analyzeMedia(request.url)
-      .then(data => sendResponse({ success: true, data }))
+      .then(result => {
+        // Extract the actual data from ApiResponse wrapper
+        const data = result.data || result;
+        sendResponse({ success: true, data });
+      })
       .catch(error => sendResponse({ success: false, error: error.message }));
     return true; // Keep channel open for async response
   }
