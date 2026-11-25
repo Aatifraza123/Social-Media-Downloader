@@ -56,30 +56,34 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // API Functions
 async function analyzeMedia(url) {
-  console.log('SMD: Analyzing URL:', url);
+  console.log('SMD Background: Analyzing URL:', url);
   
   try {
+    const requestBody = { url: url };
+    console.log('SMD Background: Request body:', JSON.stringify(requestBody));
+    
     const response = await fetch(`${API_BASE_URL}/media/analyze`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ url })
+      body: JSON.stringify(requestBody)
     });
     
-    console.log('SMD: API Response Status:', response.status);
+    console.log('SMD Background: API Response Status:', response.status);
+    
+    const responseText = await response.text();
+    console.log('SMD Background: API Response Text:', responseText);
     
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('SMD: API Error Response:', errorText);
-      throw new Error(`API returned ${response.status}: ${errorText}`);
+      throw new Error(`API returned ${response.status}: ${responseText}`);
     }
     
-    const data = await response.json();
-    console.log('SMD: Analysis Success:', data);
+    const data = JSON.parse(responseText);
+    console.log('SMD Background: Analysis Success:', data);
     return data;
   } catch (error) {
-    console.error('SMD: Analysis Failed:', error);
+    console.error('SMD Background: Analysis Failed:', error);
     throw error;
   }
 }
