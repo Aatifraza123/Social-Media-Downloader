@@ -3,6 +3,7 @@ import UrlInput from '../components/UrlInput';
 import MediaPreview from '../components/MediaPreview';
 import QualitySelector from '../components/QualitySelector';
 import DownloadProgress from '../components/DownloadProgress';
+import PremiumContent from '../components/PremiumContent';
 import { useAnalyzeUrl, useStartDownload } from '../hooks/useDownloads';
 
 export default function Downloader() {
@@ -45,34 +46,45 @@ export default function Downloader() {
   };
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto py-4">
-      {/* Search Input Bar */}
-      <UrlInput onAnalyze={handleAnalyze} isLoading={analyzeMutation.isPending} />
+    <div className="space-y-6 max-w-4xl mx-auto py-2">
+      {/* Search Input Bar (Centered & prominent) */}
+      <div className="max-w-2xl mx-auto">
+        <UrlInput onAnalyze={handleAnalyze} isLoading={analyzeMutation.isPending} />
+      </div>
 
       {/* Progress State */}
       {activeDownloadId && (
-        <DownloadProgress
-          downloadId={activeDownloadId}
-          onComplete={() => {
-            setActiveDownloadId(null);
-          }}
-        />
+        <div className="max-w-2xl mx-auto">
+          <DownloadProgress
+            downloadId={activeDownloadId}
+            onComplete={() => {
+              setActiveDownloadId(null);
+            }}
+          />
+        </div>
       )}
 
       {/* Preview Card */}
       {metadata && !activeDownloadId && (
-        <MediaPreview metadata={metadata} />
+        <div className="max-w-2xl mx-auto">
+          <MediaPreview metadata={metadata} />
+        </div>
       )}
 
       {/* Quality Options */}
       {metadata && metadata.availableFormats?.length > 0 && !activeDownloadId && (
-        <QualitySelector
-          formats={metadata.availableFormats}
-          onDownload={handleDownload}
-          isDownloading={downloadMutation.isPending}
-          activeFormatKey={activeFormatKey}
-        />
+        <div className="max-w-2xl mx-auto">
+          <QualitySelector
+            formats={metadata.availableFormats}
+            onDownload={handleDownload}
+            isDownloading={downloadMutation.isPending}
+            activeFormatKey={activeFormatKey}
+          />
+        </div>
       )}
+
+      {/* Premium SaaS Landing Features & Showcase Content */}
+      <PremiumContent />
     </div>
   );
 }
