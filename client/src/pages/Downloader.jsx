@@ -18,6 +18,7 @@ export default function Downloader() {
   const handleAnalyze = async (url) => {
     setActiveDownloadId(null);
     setActiveFormatKey(null);
+    setMetadata(null);
     const result = await analyzeMutation.mutateAsync(url);
     if (result?.success) {
       setMetadata(result.data);
@@ -36,6 +37,7 @@ export default function Downloader() {
         platform: metadata.platform,
         format: formatOption.format,
         quality: formatOption.quality,
+        formatId: formatOption.formatId,
       });
 
       if (result?.success && result.data?.downloadId) {

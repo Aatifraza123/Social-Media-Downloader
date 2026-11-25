@@ -1,14 +1,14 @@
 const logger = require('../../utils/logger');
 const PlatformDetector = require('./platformDetector');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const { promisify } = require('util');
-const execAsync = promisify(exec);
+const run = promisify(execFile);
 
-function cookiesArg() {
-  if (process.env.TIKTOK_COOKIES_FILE) return `--cookies "${process.env.TIKTOK_COOKIES_FILE}"`;
-  if (process.env.COOKIES_FILE) return `--cookies "${process.env.COOKIES_FILE}"`;
-  if (process.env.COOKIES_BROWSER) return `--cookies-from-browser ${process.env.COOKIES_BROWSER}`;
-  return '';
+function cookieArgs() {
+  const file = process.env.TIKTOK_COOKIES_FILE || process.env.COOKIES_FILE;
+  if (file) return ['--cookies', file];
+  if (process.env.COOKIES_BROWSER) return ['--cookies-from-browser', process.env.COOKIES_BROWSER];
+  return [];
 }
 
 class TikTokService {
@@ -36,10 +36,9 @@ class TikTokService {
 
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
     try {
-      const { stdout } = await execAsync(
-        `"${ytdlpPath}" ${cookiesArg()} --dump-json --no-download "${url}"`,
-        { timeout: 15000 }
-      );
+      const { stdout } = await run(ytdlpPath, [
+        ...cookieArgs(), '--dump-json', '--no-download', '--', url,
+      ], { timeout: 15000, windowsHide: true });
       const info = JSON.parse(stdout);
       
       if (info.title) metadata.title = info.title;
@@ -89,18 +88,15 @@ class TikTokService {
     const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
     const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
 
-    let formatArg = '';
-    if (quality === 'audio' || format === 'mp3') {
-      formatArg = `-x --audio-format mp3 --audio-quality 0`;
-    } else {
-      formatArg = `-f "best" --merge-output-format ${format}`;
-    }
-
-    const command = `"${ytdlpPath}" --ffmpeg-location "${ffmpegPath}" ${cookiesArg()} ${formatArg} -o "${outputPath}" --no-playlist "${url}"`;
-    logger.info(`TikTok download: ${command}`);
+    const formatArgs = quality === 'audio' || format === 'mp3'
+      ? ['-x', '--audio-format', 'mp3', '--audio-quality', '0']
+      : ['-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]', '--merge-output-format', 'mp4'];
 
     try {
-      return await execAsync(command, { timeout: 300000 });
+      return await run(ytdlpPath, [
+        '--ffmpeg-location', ffmpegPath, ...cookieArgs(), ...formatArgs,
+        '-o', outputPath, '--no-playlist', '--', url,
+      ], { timeout: 300000, windowsHide: true });
     } catch (err) {
       throw new Error(`TikTok download failed: ${err.stderr || err.message}`);
     }

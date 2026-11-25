@@ -28,6 +28,7 @@ const downloadSchema = z.object({
   platform: z.enum(['youtube', 'instagram', 'twitter', 'tiktok']).optional(),
   format: z.enum(['mp4', 'webm', 'mp3', 'm4a', 'jpg', 'png', 'webp']).optional(),
   quality: z.string().optional(),
+  formatId: z.string().max(128).optional(),
 });
 
 const settingsSchema = z.object({

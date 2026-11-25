@@ -4,6 +4,7 @@ const { v4: uuidv4 } = require('uuid');
 const Download = require('../models/Download');
 const YouTubeService = require('./platforms/youtube.service');
 const InstagramService = require('./platforms/instagram.service');
+const TikTokService = require('./platforms/tiktok.service');
 const TwitterService = require('./platforms/twitter.service');
 const PlatformDetector = require('./platforms/platformDetector');
 const cloudinaryService = require('./cloudinary.service');
@@ -29,6 +30,7 @@ class DownloadManager {
     switch (platform) {
       case 'youtube': return YouTubeService;
       case 'instagram': return InstagramService;
+      case 'tiktok': return TikTokService;
       case 'twitter': return TwitterService;
       default: throw new Error(`Unsupported platform: ${platform}`);
     }
@@ -37,7 +39,7 @@ class DownloadManager {
   async analyze(url) {
     const detected = PlatformDetector.detect(url);
     if (!detected) {
-      throw new Error('Unsupported platform. Supported: YouTube, Instagram, X (Twitter)');
+      throw new Error('Unsupported platform. Supported: YouTube, Instagram, X (Twitter), TikTok');
     }
     const service = this.getService(detected.platform);
     const metadata = await service.analyze(url);
@@ -47,15 +49,25 @@ class DownloadManager {
     };
   }
 
-  async startDownload(userId, { url, platform, format = 'mp4', quality = '720p' }) {
+  async startDownload(userId, { url, platform, format = 'mp4', quality = platform === 'youtube' ? 'best' : '720p', formatId }) {
     const service = this.getService(platform);
     let metadata = {};
     try {
       metadata = await service.analyze(url);
     } catch (err) {
+      if (platform === 'youtube') throw err;
+      if (err.code === 'X_EXTERNAL_VIDEO_UNAVAILABLE') throw err;
       logger.warn(`Metadata pre-fetch failed: ${err.message}`);
     }
 
+    if (platform === 'youtube') {
+      const selected = metadata.availableFormats.find(option =>
+        option.format === format && (quality === 'best' || option.quality === quality || option.mediaType === 'audio') &&
+        (!formatId || option.formatId === formatId));
+      if (!selected) throw new Error('Selected YouTube format is unavailable. Analyze the video again.');
+      formatId = selected.formatId;
+      quality = selected.quality;
+    }
     const download = await Download.create({
       userId: userId || null,
       originalUrl: url,
@@ -69,11 +81,11 @@ class DownloadManager {
       creator: metadata.creator || null,
     });
 
-    this.processDownload(download._id, { url, platform, format, quality });
+    this.processDownload(download._id, { url, platform, format, quality, formatId });
     return download;
   }
 
-  async processDownload(downloadId, { url, platform, format, quality }) {
+  async processDownload(downloadId, { url, platform, format, quality, formatId }) {
     const download = await Download.findById(downloadId);
     if (!download) return;
 
@@ -83,11 +95,11 @@ class DownloadManager {
       await download.save();
       this.notifyListeners(downloadId, { status: 'downloading', progress: 10 });
 
-    const service = this.getService(platform);
+      const service = this.getService(platform);
       const fileId = uuidv4();
       
       // Determine output extension based on format and media type
-      let outputExt = 'mp4';
+      let outputExt = platform === 'youtube' ? format : 'mp4';
       if (format === 'mp3') {
         outputExt = 'mp3';
       } else if (format === 'jpg' || format === 'jpeg' || quality === 'image') {
@@ -99,34 +111,20 @@ class DownloadManager {
       const outputFileName = `${fileId}.${outputExt}`;
       const outputPath = path.join(this.storagePath, outputFileName);
 
-      let downloadSuccess = false;
-      try {
-        await service.download(url, format, quality, outputPath);
-        downloadSuccess = true;
-      } catch (err) {
-        logger.warn(`Platform binary download failed (${err.message}). Using simulated file for dev preview.`);
-        // For development fallback when yt-dlp binary is absent
-        const mockContent = Buffer.from(`Simulated media stream for ${url} - ${quality}`);
-        await fs.writeFile(outputPath, mockContent);
-        downloadSuccess = true;
+      await service.download(url, format, quality, outputPath, formatId);
+      const output = await fs.stat(outputPath);
+      if (!output.isFile() || output.size === 0) {
+        throw new Error('Downloader produced no media file');
       }
-
-      if (downloadSuccess) {
-        let fileSize = 0;
-        try {
-          const stats = await fs.stat(outputPath);
-          fileSize = stats.size;
-        } catch { }
-
-        download.status = 'completed';
-        download.progress = 100;
-        download.filePath = outputPath;
-        download.fileName = outputFileName;
-        download.fileSize = fileSize;
-        download.completedAt = new Date();
-        await download.save();
-        this.notifyListeners(downloadId, { status: 'completed', progress: 100, fileSize });
-      }
+      const fileSize = output.size;
+      download.status = 'completed';
+      download.progress = 100;
+      download.filePath = outputPath;
+      download.fileName = outputFileName;
+      download.fileSize = fileSize;
+      download.completedAt = new Date();
+      await download.save();
+      this.notifyListeners(downloadId, { status: 'completed', progress: 100, fileSize });
     } catch (error) {
       logger.error(`Download process error: ${error.message}`);
       download.status = 'failed';
@@ -154,7 +152,13 @@ class DownloadManager {
     let ext = 'mp4';
     let mimeType = 'video/mp4';
     
-    if (download.format === 'mp3') {
+    if (download.platform === 'youtube' && download.fileName?.endsWith('.webm')) {
+      ext = 'webm';
+      mimeType = 'video/webm';
+    } else if (download.platform === 'youtube' && download.fileName?.endsWith('.m4a')) {
+      ext = 'm4a';
+      mimeType = 'audio/mp4';
+    } else if (download.format === 'mp3') {
       ext = 'mp3';
       mimeType = 'audio/mpeg';
     } else if (download.format === 'jpg' || download.format === 'jpeg') {

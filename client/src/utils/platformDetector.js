@@ -32,6 +32,18 @@ export const PLATFORMS = {
       /^https?:\/\/(www\.)?x\.com\/\w+\/status\/\d+/i,
     ],
   },
+  tiktok: {
+    name: 'TikTok',
+    icon: 'music',
+    color: '#000000',
+    badgeClass: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200',
+    patterns: [
+      /^https?:\/\/(www\.|vm\.|m\.)?tiktok\.com\/@[\w.-]+\/video\/\d+/i,
+      /^https?:\/\/(www\.|vm\.|m\.)?tiktok\.com\/v\/\d+/i,
+      /^https?:\/\/vm\.tiktok\.com\/[\w-]+/i,
+      /^https?:\/\/(www\.)?tiktok\.com\/t\/[\w-]+/i,
+    ],
+  },
 };
 
 export function detectPlatform(url) {

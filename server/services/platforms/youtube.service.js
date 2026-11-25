@@ -1,160 +1,78 @@
-const logger = require('../../utils/logger');
-const PlatformDetector = require('./platformDetector');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
 const { promisify } = require('util');
-const execAsync = promisify(exec);
+const PlatformDetector = require('./platformDetector');
+const run = promisify(execFile);
 
-const DEFAULT_YOUTUBE_FORMATS = [
-  { formatId: '1080p', quality: '1080p', format: 'mp4', label: '1080p Full HD', mediaType: 'video' },
-  { formatId: '720p', quality: '720p', format: 'mp4', label: '720p HD', mediaType: 'video' },
-  { formatId: '480p', quality: '480p', format: 'mp4', label: '480p SD', mediaType: 'video' },
-  { formatId: '360p', quality: '360p', format: 'mp4', label: '360p Low', mediaType: 'video' },
-  { formatId: 'audio-mp3', quality: 'audio', format: 'mp3', label: 'High Quality MP3', mediaType: 'audio' },
-  { formatId: 'audio-m4a', quality: 'audio', format: 'm4a', label: 'Audio M4A', mediaType: 'audio' },
-];
+function commonArgs() {
+  const args = ['--no-playlist'];
+  const cookies = process.env.YOUTUBE_COOKIES_FILE || process.env.COOKIES_FILE;
+  if (cookies) args.push('--cookies', cookies);
+  if (process.env.DENO_PATH) args.push('--js-runtimes', 'deno:' + process.env.DENO_PATH);
+  if (process.env.FFMPEG_PATH) args.push('--ffmpeg-location', process.env.FFMPEG_PATH);
+  return args;
+}
 
 class YouTubeService {
-  static async analyze(url) {
-    const videoId = PlatformDetector.extractVideoId(url, 'youtube');
-    if (!videoId) {
-      throw new Error('Could not extract YouTube video ID from URL');
+  static formats(streams) {
+    const usable = streams.filter(f => !f.has_drm && /^[\w.-]+$/.test(f.format_id) && f.format_id);
+    const audio = usable.filter(f => f.vcodec === 'none' && f.acodec && f.acodec !== 'none');
+    const options = new Map();
+    // yt-dlp orders formats from least to most preferred.
+    for (const f of usable) {
+      if (!f.height || !f.vcodec || f.vcodec === 'none' || !['mp4', 'webm'].includes(f.ext)) continue;
+      const separate = f.acodec === 'none' || !f.acodec;
+      const track = separate && audio.filter(a => a.ext === (f.ext === 'mp4' ? 'm4a' : 'webm')).pop();
+      if (separate && audio.length && !track) continue;
+      const resolution = Math.min(f.width || f.height, f.height);
+      const quality = resolution + 'p';
+      const fps = f.fps || 0;
+      const label = quality + (fps > 30 ? ' ' + fps + ' fps' : '') + (separate && !track ? ' (video only)' : '');
+      const formatId = f.format_id + (track ? '+' + track.format_id : '');
+      options.set([quality, fps, f.ext, separate && !track].join('/'), {
+        formatId, quality, format: f.ext, label, mediaType: 'video', resolution, fps,
+      });
     }
-
-    const isShorts = /\/shorts\//.test(url);
-    const metadata = {
-      platform: 'youtube',
-      videoId,
-      originalUrl: url,
-      type: isShorts ? 'short' : 'video',
-      title: `YouTube ${isShorts ? 'Short' : 'Video'} (${videoId})`,
-      creator: '',
-      duration: null,
-      thumbnail: `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-      availableFormats: [...DEFAULT_YOUTUBE_FORMATS],
-      notice: 'Content must be user-owned or authorized. Production downloads require yt-dlp binary.',
-    };
-
-    // Skip CLI spawn in test environment for ultra-fast unit testing
-    if (process.env.NODE_ENV === 'test') {
-      return metadata;
-    }
-
-    // Attempt real metadata probe if yt-dlp is available
-    const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
-    try {
-      const { stdout } = await execAsync(`"${ytdlpPath}" --dump-json --no-download "${url}"`, { timeout: 8000 });
-      const info = JSON.parse(stdout);
-      if (info.title) metadata.title = info.title;
-      if (info.uploader || info.channel) metadata.creator = info.uploader || info.channel;
-      if (info.duration) metadata.duration = `${Math.floor(info.duration / 60)}:${String(info.duration % 60).padStart(2, '0')}`;
-      if (info.thumbnail) metadata.thumbnail = info.thumbnail;
-
-      // Extract available resolutions and file sizes from formats
-      if (info.formats && Array.isArray(info.formats)) {
-        const resolutionLabels = {
-          4320: '8K UHD',
-          2880: '5K',
-          2160: '4K UHD',
-          1440: '2K QHD',
-          1080: 'Full HD',
-          720: 'HD',
-          480: 'SD',
-          360: 'Low',
-          240: 'Very Low',
-          144: 'Minimal'
-        };
-
-        // Collect all unique heights from video-only streams (filesize is optional — DASH often lacks it)
-        const heightSizeMap = new Map();
-        info.formats.forEach(fmt => {
-          if (fmt.height && fmt.vcodec && fmt.vcodec !== 'none') {
-            const h = fmt.height;
-            const size = fmt.filesize || fmt.filesize_approx || 0;
-            if (!heightSizeMap.has(h) || size > heightSizeMap.get(h)) {
-              heightSizeMap.set(h, size);
-            }
-          }
-        });
-
-        const sortedHeights = Array.from(heightSizeMap.keys()).sort((a, b) => b - a);
-
-        const videoFormats = sortedHeights.map(height => {
-          const key = `${height}p`;
-          const label = resolutionLabels[height] || `${height}p`;
-          const size = heightSizeMap.get(height);
-          return {
-            formatId: key,
-            quality: key,
-            format: 'mp4',
-            label: `${key} ${label}`,
-            mediaType: 'video',
-            fileSize: size || undefined
-          };
-        });
-
-        // Audio: accept filesize OR filesize_approx
-        const audioFormats = info.formats.filter(fmt =>
-          fmt.acodec && fmt.acodec !== 'none' && (!fmt.vcodec || fmt.vcodec === 'none')
-        );
-
-        let audioSize = 0;
-        if (audioFormats.length > 0) {
-          const bestAudio = audioFormats.reduce((best, curr) => {
-            const cs = curr.filesize || curr.filesize_approx || 0;
-            const bs = best.filesize || best.filesize_approx || 0;
-            return cs > bs ? curr : best;
-          });
-          audioSize = bestAudio.filesize || bestAudio.filesize_approx || 0;
-        }
-
-        const audioFormatsList = [
-          { formatId: 'audio-mp3', quality: 'audio', format: 'mp3', label: 'High Quality MP3', mediaType: 'audio', fileSize: audioSize || undefined },
-          { formatId: 'audio-m4a', quality: 'audio', format: 'm4a', label: 'Audio M4A', mediaType: 'audio', fileSize: audioSize || undefined },
-        ];
-
-        // Only replace defaults when we actually found real resolutions
-        if (videoFormats.length > 0) {
-          metadata.availableFormats = [...videoFormats, ...audioFormatsList];
-        }
+    const formats = [...options.values()].sort((a, b) => b.resolution - a.resolution || b.fps - a.fps);
+    if (audio.length || usable.some(f => f.acodec && f.acodec !== 'none')) {
+      for (const format of ['mp3', 'm4a']) {
+        formats.push({ formatId: 'audio-' + format, quality: 'audio', format, label: 'Audio ' + format.toUpperCase(), mediaType: 'audio' });
       }
-    } catch {
-      // Graceful fallback to verified formats when yt-dlp binary is absent or times out
     }
-
-    return metadata;
+    return formats;
   }
 
-  static async download(url, format = 'mp4', quality = 'best', outputPath) {
-    const ytdlpPath = process.env.YT_DLP_PATH || 'yt-dlp';
-    const ffmpegPath = process.env.FFMPEG_PATH || 'ffmpeg';
-    const denoPath = process.env.DENO_PATH;
-    const cookiesFile = process.env.YOUTUBE_COOKIES_FILE || process.env.COOKIES_FILE;
-    
-    const ffmpegArg = `--ffmpeg-location "${ffmpegPath}"`;
-    const denoArg = denoPath ? `--js-runtimes "deno:${denoPath}"` : '';
-    const cookiesArg = cookiesFile ? `--cookies "${cookiesFile}"` : '';
-
-    let formatArg = '';
-    if (quality === 'audio' || format === 'mp3' || format === 'm4a') {
-      formatArg = `-x --audio-format mp3 --audio-quality 0`;
-    } else {
-      const heightMatch = quality.match(/(\d+)p?/);
-      const height = heightMatch ? parseInt(heightMatch[1]) : 720;
-      
-      if (height >= 2160) {
-        formatArg = `-f "bestvideo[height<=${height}][ext=mp4]+bestaudio[ext=m4a]/bestvideo[height<=${height}]+bestaudio/best[height<=${height}]" --merge-output-format ${format}`;
-      } else {
-        formatArg = `-f "bestvideo[height<=${height}]+bestaudio/best[height<=${height}]" --merge-output-format ${format}`;
-      }
-    }
-
-    const command = `"${ytdlpPath}" ${ffmpegArg} ${denoArg} ${cookiesArg} ${formatArg} -o "${outputPath}" --no-playlist "${url}"`;
-    logger.info(`Executing download: ${command}`);
-
+  static async analyze(url) {
+    const videoId = PlatformDetector.extractVideoId(url, 'youtube');
+    if (!videoId) throw new Error('Could not extract YouTube video ID');
+    let info;
     try {
-      return await execAsync(command, { timeout: 300000 });
-    } catch (err) {
-      throw new Error(`yt-dlp failed: ${err.stderr || err.message}`);
+      const { stdout } = await run(process.env.YT_DLP_PATH || 'yt-dlp', [
+        ...commonArgs(), '--dump-single-json', '--skip-download', '--', url,
+      ], { timeout: 25000, maxBuffer: 32 * 1024 * 1024, windowsHide: true });
+      info = JSON.parse(stdout);
+    } catch {
+      throw new Error('Could not read the available formats from YouTube. Try again or check that the video is accessible.');
+    }
+    const availableFormats = this.formats(info.formats || []);
+    if (!availableFormats.length) throw new Error('YouTube returned no downloadable formats for this video.');
+    return { platform: 'youtube', videoId, originalUrl: url, type: url.includes('/shorts/') ? 'short' : 'video',
+      title: info.title, creator: info.uploader || info.channel, thumbnail: info.thumbnail,
+      duration: info.duration_string, availableFormats };
+  }
+
+  static async download(url, format, quality, outputPath, formatId) {
+    const args = commonArgs();
+    if (formatId === 'audio-' + format && ['mp3', 'm4a'].includes(format)) {
+      args.push('-f', 'bestaudio/best', '-x', '--audio-format', format, '--audio-quality', '0');
+    } else {
+      if (!formatId || !/^[\w.-]+(?:\+[\w.-]+)?$/.test(formatId)) throw new Error('Invalid YouTube stream selection');
+      args.push('-f', formatId, '--merge-output-format', format);
+    }
+    try {
+      await run(process.env.YT_DLP_PATH || 'yt-dlp', [...args, '--no-progress', '-o', outputPath, '--', url],
+        { timeout: 300000, windowsHide: true });
+    } catch {
+      throw new Error('Could not download the selected YouTube format. Analyze the video again to refresh its formats.');
     }
   }
 }

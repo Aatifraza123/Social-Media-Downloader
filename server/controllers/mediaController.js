@@ -23,7 +23,7 @@ exports.analyze = async (req, res) => {
 
     const detected = PlatformDetector.detect(url);
     if (!detected) {
-      return ApiResponse.error(res, 'Unsupported platform. Supported: YouTube, Instagram, X (Twitter)', 400);
+      return ApiResponse.error(res, 'Unsupported platform. Supported: YouTube, Instagram, X (Twitter), TikTok', 400);
     }
 
     const metadata = await downloadManager.analyze(url);
@@ -36,7 +36,7 @@ exports.analyze = async (req, res) => {
 
 exports.download = async (req, res) => {
   try {
-    const { url, platform, format, quality } = req.body;
+    const { url, platform, format, quality, formatId } = req.body;
     
     // Log incoming request for debugging
     logger.info('Download request received:', { url, platform, format, quality });
@@ -44,7 +44,7 @@ exports.download = async (req, res) => {
     await validateUrl(url);
 
     const download = await downloadManager.startDownload(null, {
-      url, platform, format, quality,
+      url, platform, format, quality, formatId,
     });
 
     return ApiResponse.success(res, {

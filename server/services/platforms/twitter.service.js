@@ -16,6 +16,20 @@ function jsRuntimeArg() {
   return '';
 }
 
+function externalVideoError(stderr = '') {
+  let message;
+  if (/ERROR: \[twitter:amplify\][^\n]*Domain Not Found/i.test(stderr)) {
+    message = 'The original video host for this X post is unavailable. Try a repost with the video attached.';
+  } else if (/ERROR: Unsupported URL: https?:\/\/(?:www\.)?snpy\.tv(?:\/|\s|$)/i.test(stderr)) {
+    message = 'This X post links to an unsupported SnappyTV video. Try a repost with the video attached.';
+  }
+  if (message) {
+    const error = new Error(message);
+    error.code = 'X_EXTERNAL_VIDEO_UNAVAILABLE';
+    return error;
+  }
+}
+
 class TwitterService {
   static async analyze(url) {
     const tweetId = PlatformDetector.extractVideoId(url, 'twitter');
@@ -96,7 +110,9 @@ class TwitterService {
           ];
         }
       }
-    } catch {
+    } catch (err) {
+      const unavailable = externalVideoError(err.stderr);
+      if (unavailable) throw unavailable;
       // Graceful fallback to default metadata
     }
 
@@ -127,7 +143,7 @@ class TwitterService {
     try {
       return await execAsync(command, { timeout: 300000 });
     } catch (err) {
-      throw new Error(`Twitter media download failed: ${err.stderr || err.message}`);
+      throw externalVideoError(err.stderr) || new Error(`Twitter media download failed: ${err.stderr || err.message}`);
     }
   }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Loader2, ArrowRight, Clipboard, Youtube, Instagram, Twitter, CheckCircle2 } from 'lucide-react';
+import { Search, Loader2, ArrowRight, Clipboard, Youtube, Instagram, Twitter, Music, CheckCircle2 } from 'lucide-react';
 import { detectPlatform } from '../utils/platformDetector';
 import toast from 'react-hot-toast';
 
@@ -47,6 +47,7 @@ export default function UrlInput({ onAnalyze, isLoading, resetSignal }) {
     switch (detected.id) {
       case 'youtube': return <Youtube className="w-4 h-4 text-red-500" />;
       case 'instagram': return <Instagram className="w-4 h-4 text-pink-500" />;
+      case 'tiktok': return <Music className="w-4 h-4" />;
       case 'twitter': return <Twitter className="w-4 h-4 text-sky-400" />;
       default: return null;
     }
@@ -64,7 +65,7 @@ export default function UrlInput({ onAnalyze, isLoading, resetSignal }) {
           High-bitrate media ingestion, on demand.
         </h1>
         <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 max-w-md mx-auto leading-relaxed">
-          Direct stream parsing from YouTube, Instagram Reels, and X (Twitter). Lossless 4K, 1080p, and MP3 audio.
+          Direct stream parsing from YouTube, Instagram Reels, X (Twitter), and TikTok. Lossless 4K, 1080p, and MP3 audio.
         </p>
       </div>
 

@@ -62,12 +62,15 @@ describe('Social Media Downloader Pro - Comprehensive Test Suite', () => {
   });
 
   describe('2. Metadata Analysis Fallback Mechanisms', () => {
-    test('YouTubeService returns structured formats without crashing', async () => {
-      const metadata = await YouTubeService.analyze('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-      expect(metadata.platform).toBe('youtube');
-      expect(metadata.availableFormats.length).toBeGreaterThan(0);
-      expect(metadata.availableFormats[0]).toHaveProperty('quality');
-      expect(metadata.availableFormats[0]).toHaveProperty('format');
+    test('YouTube options preserve the original video stream and matching audio', () => {
+      const formats = YouTubeService.formats([
+        { format_id: '248', width: 1920, height: 1080, fps: 60, ext: 'webm', vcodec: 'vp9', acodec: 'none' },
+        { format_id: '251', ext: 'webm', vcodec: 'none', acodec: 'opus' },
+      ]);
+      expect(formats.filter(f => f.mediaType === 'video')).toEqual([
+        expect.objectContaining({ formatId: '248+251', quality: '1080p', format: 'webm', fps: 60 }),
+      ]);
+      expect(YouTubeService.formats([])).toEqual([]);
     });
 
     test('InstagramService returns structured metadata', async () => {
@@ -112,12 +115,18 @@ describe('Social Media Downloader Pro - Comprehensive Test Suite', () => {
       expect(res.body.success).toBe(false);
     });
 
-    test('Protected route /api/media/analyze rejects unauthenticated access with 401', async () => {
-      const res = await request(app).post('/api/media/analyze').send({
-        url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      });
-      expect(res.statusCode).toBe(401);
-      expect(res.body.success).toBe(false);
+    test('Guests can analyze a supported media URL', async () => {
+      const media = { platform: 'youtube', title: 'Guest preview' };
+      const analyze = jest.spyOn(YouTubeService, 'analyze').mockResolvedValue(media);
+      try {
+        const res = await request(app).post('/api/media/analyze').send({
+          url: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+        });
+        expect(res.statusCode).toBe(200);
+        expect(res.body.data).toMatchObject(media);
+      } finally {
+        analyze.mockRestore();
+      }
     });
 
     test('Login endpoint rejects invalid email payload', async () => {

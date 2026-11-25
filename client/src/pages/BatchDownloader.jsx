@@ -11,12 +11,14 @@ const PLATFORM_COLORS = {
   youtube: 'text-red-500',
   instagram: 'text-pink-500',
   twitter: 'text-sky-500',
+  tiktok: 'text-gray-500',
 };
 
 const PLATFORM_LABELS = {
   youtube: 'YouTube',
   instagram: 'Instagram',
   twitter: 'X',
+  tiktok: 'TikTok',
 };
 
 function StatusBadge({ status }) {
