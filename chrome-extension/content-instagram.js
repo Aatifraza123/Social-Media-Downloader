@@ -209,6 +209,19 @@ function createDownloadButton(postUrl = null) {
 async function showDownloadModal(url, buttonElement) {
   console.log('SMD: showDownloadModal called for:', url);
   
+  // Clean the URL - remove query parameters and tracking codes
+  let cleanUrl = url;
+  try {
+    const urlObj = new URL(url);
+    // Remove query parameters for Instagram
+    if (urlObj.hostname.includes('instagram.com')) {
+      cleanUrl = urlObj.origin + urlObj.pathname;
+    }
+    console.log('SMD: Cleaned URL:', cleanUrl);
+  } catch (e) {
+    console.error('SMD: URL parsing error:', e);
+  }
+  
   // Show loading state
   buttonElement.disabled = true;
   const originalHTML = buttonElement.innerHTML;
@@ -225,7 +238,7 @@ async function showDownloadModal(url, buttonElement) {
     // Analyze media
     const response = await chrome.runtime.sendMessage({
       action: 'analyzeMedia',
-      url: url
+      url: cleanUrl
     });
     
     console.log('SMD: Response from background:', response);
@@ -237,7 +250,7 @@ async function showDownloadModal(url, buttonElement) {
     const metadata = response.data;
     
     // Create modal
-    createDownloadOptionsModal(url, metadata, buttonElement, originalHTML);
+    createDownloadOptionsModal(cleanUrl, metadata, buttonElement, originalHTML);
     
   } catch (error) {
     console.error('SMD: Error in showDownloadModal:', error);
